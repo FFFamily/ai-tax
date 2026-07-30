@@ -3,6 +3,15 @@ package com.rcszh.tax.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.common.BusinessException;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
+import com.rcszh.tax.dto.executiontask.ExecutionIncomeTypeOptionResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionMaterialOptionResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskDetailResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskFileResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskMaterialResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskOptionsResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskPageResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskSummaryResponse;
 import com.rcszh.tax.entity.TaxExecutionTask;
 import com.rcszh.tax.entity.TaxExecutionTaskFile;
 import com.rcszh.tax.enums.ExecutionTaskStatusEnum;
@@ -77,19 +86,19 @@ public class ExecutionTaskService {
      *
      * @return 创建任务选项
      */
-    public Map<String, Object> options() {
-        List<Map<String, Object>> incomeTypes = new ArrayList<>();
+    public ExecutionTaskOptionsResponse options() {
+        List<ExecutionIncomeTypeOptionResponse> incomeTypes = new ArrayList<>();
         for (OverseasIncomeTypeEnum incomeType : OverseasIncomeTypeEnum.values()) {
-            Map<String, Object> option = new LinkedHashMap<>();
-            option.put("code", incomeType.name());
-            option.put("label", incomeType.getLabel());
-            option.put("materials", incomeType.getMaterials().stream().map(this::materialOption).toList());
+            ExecutionIncomeTypeOptionResponse option = new ExecutionIncomeTypeOptionResponse();
+            option.setCode(incomeType.name());
+            option.setLabel(incomeType.getLabel());
+            option.setMaterials(incomeType.getMaterials().stream().map(this::materialOption).toList());
             incomeTypes.add(option);
         }
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("incomeTypes", incomeTypes);
-        result.put("allowedExtensions", ALLOWED_EXTENSIONS.stream().sorted().toList());
-        result.put("maxFileSize", MAX_FILE_SIZE);
+        ExecutionTaskOptionsResponse result = new ExecutionTaskOptionsResponse();
+        result.setIncomeTypes(incomeTypes);
+        result.setAllowedExtensions(ALLOWED_EXTENSIONS.stream().sorted().toList());
+        result.setMaxFileSize(MAX_FILE_SIZE);
         return result;
     }
 
@@ -100,7 +109,7 @@ public class ExecutionTaskService {
      * @return 新建任务详情
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> create(String incomeTypeCode) {
+    public ExecutionTaskDetailResponse create(String incomeTypeCode) {
         OverseasIncomeTypeEnum incomeType = parseIncomeType(incomeTypeCode);
         LocalDateTime now = LocalDateTime.now();
         TaxExecutionTask task = new TaxExecutionTask();
@@ -119,7 +128,7 @@ public class ExecutionTaskService {
      * @param size 每页数量
      * @return 任务分页数据
      */
-    public Map<String, Object> list(int page, int size) {
+    public ExecutionTaskPageResponse list(int page, int size) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 100);
         long total = taskMapper.selectCount(null);
@@ -128,15 +137,15 @@ public class ExecutionTaskService {
                 .orderByDesc(TaxExecutionTask::getCreatedAt)
                 .orderByDesc(TaxExecutionTask::getId)
                 .last("LIMIT " + normalizedSize + " OFFSET " + offset));
-        List<Map<String, Object>> items = tasks.stream().map(task -> {
+        List<ExecutionTaskSummaryResponse> items = tasks.stream().map(task -> {
             List<TaxExecutionTaskFile> files = listFiles(task.getId());
             return summary(task, files);
         }).toList();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("items", items);
-        result.put("total", total);
-        result.put("page", normalizedPage);
-        result.put("size", normalizedSize);
+        ExecutionTaskPageResponse result = new ExecutionTaskPageResponse();
+        result.setItems(items);
+        result.setTotal(total);
+        result.setPage(normalizedPage);
+        result.setSize(normalizedSize);
         return result;
     }
 
@@ -146,7 +155,7 @@ public class ExecutionTaskService {
      * @param taskId 执行任务 ID
      * @return 任务详情
      */
-    public Map<String, Object> get(String taskId) {
+    public ExecutionTaskDetailResponse get(String taskId) {
         TaxExecutionTask task = requireTask(taskId);
         return detail(task, listFiles(taskId));
     }
@@ -160,7 +169,9 @@ public class ExecutionTaskService {
      * @return 上传后的任务详情
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> upload(String taskId, String materialTypeCode, List<MultipartFile> uploads) {
+    public ExecutionTaskDetailResponse upload(String taskId,
+                                              String materialTypeCode,
+                                              List<MultipartFile> uploads) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
         requireCollecting(task);
         OverseasIncomeTypeEnum incomeType = parseIncomeType(task.getIncomeType());
@@ -248,7 +259,7 @@ public class ExecutionTaskService {
      * @return 提交后的任务详情
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> submit(String taskId) {
+    public ExecutionTaskDetailResponse submit(String taskId) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
         if (StringUtils.hasText(task.getParseTaskId())) {
             return detail(task, listFiles(taskId));
@@ -298,12 +309,12 @@ public class ExecutionTaskService {
      * @param taskId 执行任务 ID
      * @return 内部解析任务及文件项结果
      */
-    public Map<String, Object> result(String taskId) {
+    public ExecutionTaskResultResponse result(String taskId) {
         TaxExecutionTask task = requireTask(taskId);
         if (!StringUtils.hasText(task.getParseTaskId())) {
             throw BusinessException.conflict("任务尚未提交处理");
         }
-        Map<String, Object> result = documentTaskServer.getTaskAndItemById(task.getParseTaskId());
+        ExecutionTaskResultResponse result = documentTaskServer.getExecutionTaskResultById(task.getParseTaskId());
         if (result == null) {
             throw BusinessException.notFound("内部解析任务不存在");
         }
@@ -313,78 +324,90 @@ public class ExecutionTaskService {
     /**
      * 组装任务详情，按预期材料顺序合并文件并计算缺失项。
      */
-    private Map<String, Object> detail(TaxExecutionTask task, List<TaxExecutionTaskFile> files) {
+    private ExecutionTaskDetailResponse detail(TaxExecutionTask task, List<TaxExecutionTaskFile> files) {
         OverseasIncomeTypeEnum incomeType = parseIncomeType(task.getIncomeType());
         Map<String, List<TaxExecutionTaskFile>> grouped = files.stream().collect(Collectors.groupingBy(
                 TaxExecutionTaskFile::getMaterialType, LinkedHashMap::new, Collectors.toList()));
-        List<Map<String, Object>> materials = new ArrayList<>();
-        List<Map<String, Object>> missing = new ArrayList<>();
+        List<ExecutionTaskMaterialResponse> materials = new ArrayList<>();
+        List<ExecutionMaterialOptionResponse> missing = new ArrayList<>();
         for (IncomeMaterialTypeEnum materialType : incomeType.getMaterials()) {
             List<TaxExecutionTaskFile> materialFiles = grouped.getOrDefault(materialType.name(), List.of());
-            Map<String, Object> material = materialOption(materialType);
-            material.put("required", true);
-            material.put("uploaded", !materialFiles.isEmpty());
-            material.put("files", materialFiles.stream().map(this::fileMap).toList());
+            ExecutionTaskMaterialResponse material = new ExecutionTaskMaterialResponse();
+            material.setCode(materialType.name());
+            material.setLabel(materialType.getLabel());
+            material.setRequired(true);
+            material.setUploaded(!materialFiles.isEmpty());
+            material.setFiles(materialFiles.stream().map(this::fileResponse).toList());
             materials.add(material);
             if (materialFiles.isEmpty()) {
                 missing.add(materialOption(materialType));
             }
         }
-        Map<String, Object> result = summary(task, files);
-        result.put("materials", materials);
-        result.put("missingMaterials", missing);
-        result.put("complete", missing.isEmpty());
-        result.put("submittedAt", task.getSubmittedAt());
-        result.put("errorMessage", task.getErrorMessage());
+        ExecutionTaskDetailResponse result = new ExecutionTaskDetailResponse();
+        populateSummary(result, task, files);
+        result.setMaterials(materials);
+        result.setMissingMaterials(missing);
+        result.setComplete(missing.isEmpty());
+        result.setSubmittedAt(task.getSubmittedAt());
+        result.setErrorMessage(task.getErrorMessage());
         return result;
     }
 
     /**
      * 组装任务列表摘要和材料完成数量。
      */
-    private Map<String, Object> summary(TaxExecutionTask task, List<TaxExecutionTaskFile> files) {
+    private ExecutionTaskSummaryResponse summary(TaxExecutionTask task, List<TaxExecutionTaskFile> files) {
+        ExecutionTaskSummaryResponse result = new ExecutionTaskSummaryResponse();
+        populateSummary(result, task, files);
+        return result;
+    }
+
+    /**
+     * 将任务实体和文件统计填充到任务摘要 DTO。
+     */
+    private void populateSummary(ExecutionTaskSummaryResponse result,
+                                 TaxExecutionTask task,
+                                 List<TaxExecutionTaskFile> files) {
         OverseasIncomeTypeEnum incomeType = parseIncomeType(task.getIncomeType());
         Set<String> uploadedTypes = files.stream().map(TaxExecutionTaskFile::getMaterialType)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", task.getId());
-        result.put("incomeType", incomeType.name());
-        result.put("incomeTypeLabel", incomeType.getLabel());
-        result.put("status", task.getStatus());
-        result.put("statusLabel", statusLabel(task.getStatus()));
-        result.put("parseTaskId", task.getParseTaskId());
-        result.put("expectedMaterialCount", incomeType.getMaterials().size());
-        result.put("uploadedMaterialCount", uploadedTypes.size());
-        result.put("missingMaterialCount", incomeType.getMaterials().size() - uploadedTypes.size());
-        result.put("fileCount", files.size());
-        result.put("createdAt", task.getCreatedAt());
-        result.put("updatedAt", task.getUpdatedAt());
-        return result;
+        result.setId(task.getId());
+        result.setIncomeType(incomeType.name());
+        result.setIncomeTypeLabel(incomeType.getLabel());
+        result.setStatus(task.getStatus());
+        result.setStatusLabel(statusLabel(task.getStatus()));
+        result.setParseTaskId(task.getParseTaskId());
+        result.setExpectedMaterialCount(incomeType.getMaterials().size());
+        result.setUploadedMaterialCount(uploadedTypes.size());
+        result.setMissingMaterialCount(incomeType.getMaterials().size() - uploadedTypes.size());
+        result.setFileCount(files.size());
+        result.setCreatedAt(task.getCreatedAt());
+        result.setUpdatedAt(task.getUpdatedAt());
     }
 
     /**
      * 将材料枚举转换为前端选项结构。
      */
-    private Map<String, Object> materialOption(IncomeMaterialTypeEnum materialType) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("code", materialType.name());
-        result.put("label", materialType.getLabel());
+    private ExecutionMaterialOptionResponse materialOption(IncomeMaterialTypeEnum materialType) {
+        ExecutionMaterialOptionResponse result = new ExecutionMaterialOptionResponse();
+        result.setCode(materialType.name());
+        result.setLabel(materialType.getLabel());
         return result;
     }
 
     /**
      * 将文件实体转换为前端展示和下载所需结构。
      */
-    private Map<String, Object> fileMap(TaxExecutionTaskFile file) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", file.getId());
-        result.put("name", file.getOriginalFileName());
-        result.put("contentType", file.getContentType());
-        result.put("extension", file.getExtension());
-        result.put("size", file.getSizeBytes());
-        result.put("parseTaskItemId", file.getParseTaskItemId());
-        result.put("downloadUrl", "/execution-tasks/%s/files/%s".formatted(file.getExecutionTaskId(), file.getId()));
-        result.put("createdAt", file.getCreatedAt());
+    private ExecutionTaskFileResponse fileResponse(TaxExecutionTaskFile file) {
+        ExecutionTaskFileResponse result = new ExecutionTaskFileResponse();
+        result.setId(file.getId());
+        result.setName(file.getOriginalFileName());
+        result.setContentType(file.getContentType());
+        result.setExtension(file.getExtension());
+        result.setSize(file.getSizeBytes());
+        result.setParseTaskItemId(file.getParseTaskItemId());
+        result.setDownloadUrl("/execution-tasks/%s/files/%s".formatted(file.getExecutionTaskId(), file.getId()));
+        result.setCreatedAt(file.getCreatedAt());
         return result;
     }
 

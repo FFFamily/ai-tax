@@ -6,6 +6,9 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskResultItemResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
 import com.rcszh.tax.entity.TaxTask;
 import com.rcszh.tax.entity.TaxTaskItem;
 import com.rcszh.tax.enums.RunTaskStatusEnum;
@@ -103,6 +106,28 @@ public class DocumentTaskServer {
         return result;
     }
 
+    /**
+     * 以强类型 DTO 查询用户执行任务需要展示的内部解析结果。
+     * 旧任务接口继续使用 Map 返回值，该方法专供用户执行任务接口调用。
+     *
+     * @param id 内部解析任务 ID
+     * @return 内部解析任务结果，不存在时返回 null
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ExecutionTaskResultResponse getExecutionTaskResultById(String id) {
+        TaxTask task = taxTaskMapper.selectById(id);
+        if (task == null) {
+            return null;
+        }
+        List<TaxTaskItem> taskItems = taxTaskItemMapper.selectList(new LambdaQueryWrapper<TaxTaskItem>()
+                .eq(TaxTaskItem::getTaskId, id));
+        ExecutionTaskResultResponse result = new ExecutionTaskResultResponse();
+        result.setId(task.getId());
+        result.setStatus(task.getStatus());
+        result.setItems(taskItems.stream().map(this::toExecutionTaskResultItem).toList());
+        return result;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> getTaskById(String id) {
         TaxTask task = taxTaskMapper.selectById(id);
@@ -179,6 +204,29 @@ public class DocumentTaskServer {
         return map;
     }
 
+    private ExecutionTaskResultItemResponse toExecutionTaskResultItem(TaxTaskItem item) {
+        ExecutionTaskResultItemResponse result = new ExecutionTaskResultItemResponse();
+        result.setId(item.getId());
+        result.setTaskId(item.getTaskId());
+        result.setDocumentId(item.getDocumentId());
+        result.setRequestedDocumentType(item.getRequestedDocumentType());
+        result.setResolvedDocumentId(item.getResolvedDocumentId());
+        result.setRouteVariant(item.getRouteVariant());
+        result.setRouteConfidence(item.getRouteConfidence());
+        result.setRouteReason(item.getRouteReason());
+        result.setNeedHumanReview(item.getNeedHumanReview());
+        result.setRemoteTaskId(item.getRemoteTaskId());
+        result.setTaskResult(item.getTaskResult());
+        result.setFileUrl(item.getFileUrl());
+        result.setParseStatus(item.getParseStatus());
+        result.setChangeResult(item.getChangeResult());
+        result.setTableResult(item.getTableResult());
+        result.setFileRule(item.getFileRule());
+        result.setReviewReasons(item.getReviewReasons());
+        result.setRouteSummary(buildRouteSummaryResponse(item));
+        return result;
+    }
+
     private Map<String, Object> buildRouteSummaryMap(TaxTaskItem item) {
         Map<String, Object> routeSummary = new LinkedHashMap<>();
         routeSummary.put("documentId", item.getResolvedDocumentId());
@@ -189,6 +237,18 @@ public class DocumentTaskServer {
         routeSummary.put("routeSource", inferRouteSource(item.getRouteReason()));
         routeSummary.put("reasons", splitRouteReasons(item.getRouteReason()));
         return routeSummary;
+    }
+
+    private ExecutionTaskRouteSummaryResponse buildRouteSummaryResponse(TaxTaskItem item) {
+        ExecutionTaskRouteSummaryResponse result = new ExecutionTaskRouteSummaryResponse();
+        result.setDocumentId(item.getResolvedDocumentId());
+        result.setDocumentType(item.getRequestedDocumentType());
+        result.setVariant(item.getRouteVariant());
+        result.setConfidence(item.getRouteConfidence());
+        result.setNeedHumanReview(item.getNeedHumanReview());
+        result.setRouteSource(inferRouteSource(item.getRouteReason()));
+        result.setReasons(splitRouteReasons(item.getRouteReason()));
+        return result;
     }
 
     private String inferRouteSource(String routeReason) {
