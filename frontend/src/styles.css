@@ -115,6 +115,63 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .composer-options select, .composer-options input { width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--line); outline: none; color: var(--ink-soft); background: #fafbf8; font-size: 9px; }
 .composer-hint { grid-column: 1/-1; color: #9aa39e; font-size: 8px; }
 
+.creation-view { flex: 1; min-height: 0; overflow: auto; padding: 34px 22px 24px; }
+.creation-heading { margin-bottom: 24px; }
+.creation-heading h2 { margin: 0; font: 700 22px Georgia, "Songti SC", serif; }
+.creation-heading p { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.income-options { display: grid; border-top: 1px solid var(--line); }
+.income-option { min-height: 70px; padding: 13px 10px; display: grid; grid-template-columns: 31px minmax(0,1fr) 18px; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background .18s ease; }
+.income-option:hover, .income-option.selected { background: var(--white); }
+.income-option input { position: absolute; opacity: 0; pointer-events: none; }
+.income-index { color: var(--orange); font: 500 8px "DM Mono", monospace; }
+.income-copy strong, .income-copy small { display: block; }
+.income-copy strong { font-size: 12px; }
+.income-copy small { margin-top: 4px; color: var(--muted); font-size: 9px; }
+.radio-mark { width: 15px; height: 15px; border: 1px solid var(--line-dark); border-radius: 50%; }
+.income-option.selected .radio-mark { border: 4px solid var(--green); }
+.primary-command, .submit-command { min-height: 42px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: space-between; gap: 28px; border: 0; color: #fff; background: var(--ink); font-size: 10px; font-weight: 700; }
+.primary-command { width: 100%; margin-top: 24px; }
+.primary-command:hover, .submit-command:hover { background: #2c3935; }
+.primary-command span, .submit-command span { font-size: 16px; }
+
+.material-stream { flex: 1; min-height: 0; overflow: auto; padding: 22px 20px; }
+.material-overview { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 10px; }
+.material-overview h2 { margin: 0; font: 700 19px Georgia, "Songti SC", serif; }
+.material-overview > strong { color: var(--green); font: 500 16px "DM Mono", monospace; }
+.completion-track { height: 3px; margin-bottom: 18px; overflow: hidden; background: #dfe4de; }
+.completion-track i { height: 100%; display: block; background: var(--green); transition: width .25s ease; }
+.material-row { padding: 16px 0; border-top: 1px solid var(--line); }
+.material-row:last-child { border-bottom: 1px solid var(--line); }
+.material-row-head { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: start; gap: 9px; }
+.material-number { padding-top: 2px; color: var(--orange); font: 500 8px "DM Mono", monospace; }
+.material-row-head h3 { margin: 0; font-size: 11px; line-height: 1.55; }
+.material-row-head small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+.material-state { padding: 4px 6px; border: 1px solid var(--line); color: var(--muted); background: #f5f6f2; font-size: 7px; white-space: nowrap; }
+.material-row.uploaded .material-state { border-color: #c6d9cd; color: var(--green); background: #f0f7f2; }
+.file-list { margin: 10px 0 0 37px; display: grid; gap: 5px; }
+.file-item { min-width: 0; display: flex; align-items: center; border: 1px solid var(--line); background: var(--white); }
+.file-item a { min-width: 0; flex: 1; padding: 7px 8px; display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; }
+.file-extension { width: 28px; flex: 0 0 auto; color: var(--blue); font: 500 7px "DM Mono", monospace; text-transform: uppercase; }
+.file-item a > span:last-child { min-width: 0; }
+.file-item strong, .file-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-item strong { font-size: 8px; }
+.file-item small { margin-top: 2px; color: var(--muted); font-size: 7px; }
+.file-item button { width: 29px; height: 29px; flex: 0 0 auto; border: 0; border-left: 1px solid var(--line); color: var(--muted); background: transparent; font-size: 15px; }
+.file-item button:hover { color: var(--danger); background: #fbefed; }
+.upload-command { margin: 9px 0 0 37px; display: inline-flex; color: var(--blue); font-size: 8px; font-weight: 700; cursor: pointer; }
+.upload-command input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.upload-command.busy { color: var(--muted); cursor: wait; }
+.task-submit-bar { min-height: 76px; flex: 0 0 auto; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); background: var(--white); }
+.task-submit-bar strong, .task-submit-bar small { display: block; }
+.task-submit-bar strong { font-size: 10px; }
+.task-submit-bar small { margin-top: 4px; color: var(--muted); font-size: 8px; }
+.locked-label { padding: 7px 9px; border: 1px solid var(--line); color: var(--muted); font-size: 8px; }
+.toast-message { max-width: calc(100% - 32px); position: absolute; left: 16px; bottom: 88px; z-index: 10; padding: 10px 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-dark); background: var(--white); box-shadow: 0 8px 24px rgba(23,32,29,.12); color: var(--ink-soft); font-size: 9px; }
+.conversation-panel { position: relative; }
+.toast-message > span { width: 3px; height: 16px; background: var(--yellow); }
+.toast-message.success > span { background: var(--green); }
+.toast-message.error > span { background: var(--danger); }
+
 .workspace-panel { display: flex; flex-direction: column; background: var(--white); }
 .workspace-header { height: 76px; flex: 0 0 auto; padding: 0 24px; border-bottom: 1px solid var(--line); }
 .task-actions { display: flex; gap: 7px; }
@@ -135,6 +192,17 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .empty-process span:last-child { border-right: 0; }
 .empty-process b { margin-right: 5px; color: var(--orange); font: 500 8px "DM Mono", monospace; }
 .workspace-content { flex: 1; min-height: 0; overflow: auto; }
+.collection-summary { min-height: 310px; padding: 42px 32px; display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: start; gap: 42px; }
+.collection-score { width: 140px; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--line-dark); box-shadow: 9px 9px 0 #e8ece6; }
+.collection-score strong { color: var(--green); font: 500 29px "DM Mono", monospace; }
+.collection-score span { margin-top: 7px; color: var(--muted); font-size: 8px; }
+.missing-list h3 { margin: 0 0 15px; font: 700 17px Georgia, "Songti SC", serif; }
+.missing-list p { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: 10px; line-height: 1.5; }
+.processing-error { padding: 13px 24px; display: flex; gap: 12px; border-bottom: 1px solid #ecd2ce; color: var(--danger); background: #fff6f4; }
+.processing-error span { flex: 0 0 auto; font-size: 9px; font-weight: 700; }
+.processing-error p { margin: 0; font-size: 9px; line-height: 1.5; }
+.artifact-tools { display: flex; align-items: center; gap: 9px; }
+.artifact-tools select { height: 27px; padding: 0 7px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--white); font-size: 8px; }
 .task-summary { padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); background: #f7f9f5; }
 .task-title { min-width: 0; display: flex; align-items: center; gap: 11px; }
 .task-title div { min-width: 0; }
@@ -229,4 +297,16 @@ td.primary-cell { font-weight: 700; }
   .review-fields { grid-template-columns: 1fr; }
   .result-foot { flex-direction: column; }
   .task-actions button span { display: none; }
+  .creation-view { padding: 25px 16px; }
+  .material-stream { padding: 18px 15px; }
+  .collection-summary { padding: 30px 20px; grid-template-columns: 120px minmax(0,1fr); gap: 28px; }
+  .collection-score { width: 112px; height: 112px; }
+}
+
+@media (max-width: 520px) {
+  .collection-summary { display: block; }
+  .collection-score { margin-bottom: 30px; }
+  .task-submit-bar { align-items: stretch; }
+  .submit-command { flex: 0 0 auto; }
+  .file-list, .upload-command { margin-left: 0; }
 }

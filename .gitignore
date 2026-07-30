@@ -38,6 +38,6 @@ build/
 .qoder
 
 #!**/src/main/resources/application-local.yml
-
+data
 log.path_IS_UNDEFINED
 src/main/resources/application-local.yaml

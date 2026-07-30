@@ -64,6 +64,36 @@ CREATE TABLE IF NOT EXISTS tax_task_item (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS tax_execution_task (
+    id VARCHAR(64) PRIMARY KEY,
+    income_type VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    parse_task_id VARCHAR(64),
+    submitted_at DATETIME,
+    error_message VARCHAR(1000),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_execution_task_parse_task (parse_task_id),
+    KEY idx_execution_task_created_at (created_at)
+);
+
+CREATE TABLE IF NOT EXISTS tax_execution_task_file (
+    id VARCHAR(64) PRIMARY KEY,
+    execution_task_id VARCHAR(64) NOT NULL,
+    material_type VARCHAR(64) NOT NULL,
+    original_file_name VARCHAR(500) NOT NULL,
+    storage_path VARCHAR(1000) NOT NULL,
+    content_type VARCHAR(255),
+    extension VARCHAR(32) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    parse_task_item_id VARCHAR(64),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_execution_file_task (execution_task_id),
+    KEY idx_execution_file_material (execution_task_id, material_type),
+    KEY idx_execution_file_parse_item (parse_task_item_id)
+);
+
 CREATE TABLE IF NOT EXISTS tax_api_token (
     id VARCHAR(64) PRIMARY KEY,
     provider VARCHAR(64) NOT NULL,

@@ -62,9 +62,15 @@ public class DocumentTaskServer {
 
     @Transactional(rollbackFor = Exception.class)
     public String createTask(CreateDocumentTaskDto dto) {
+        return createTaskWithItems(dto).taskId();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public CreatedTask createTaskWithItems(CreateDocumentTaskDto dto) {
         TaxTask task = new TaxTask();
         task.setStatus(RunTaskStatusEnum.RUNNING.getStatus());
         taxTaskMapper.insert(task);
+        List<String> itemIds = new java.util.ArrayList<>();
         if (dto.getItems() != null) {
             for (CreateDocumentTaskDto.Item source : dto.getItems()) {
                 TaxTaskItem item = new TaxTaskItem();
@@ -75,9 +81,13 @@ public class DocumentTaskServer {
                 item.setNeedHumanReview(Boolean.FALSE);
                 item.setFileUrl(source.getFileUrl());
                 taxTaskItemMapper.insert(item);
+                itemIds.add(item.getId());
             }
         }
-        return task.getId();
+        return new CreatedTask(task.getId(), List.copyOf(itemIds));
+    }
+
+    public record CreatedTask(String taskId, List<String> itemIds) {
     }
 
     @Transactional(rollbackFor = Exception.class)

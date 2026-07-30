@@ -14,6 +14,7 @@ public class AppProperties {
     public static class Storage {
         private String baseDir = "./data";
         private String publicBaseUrl = "";
+        private String internalBaseUrl = "http://127.0.0.1:8080";
     }
 
     @Data

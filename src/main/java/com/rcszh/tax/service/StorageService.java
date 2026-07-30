@@ -2,11 +2,15 @@ package com.rcszh.tax.service;
 
 import com.rcszh.tax.config.AppProperties;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 @Service
 public class StorageService {
@@ -35,11 +39,54 @@ public class StorageService {
         return resolved;
     }
 
+    public Path store(MultipartFile file, String relativePath) throws IOException {
+        Path target = ensureParent(relativePath);
+        try (var input = file.getInputStream()) {
+            Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return target;
+    }
+
+    public void delete(String relativePath) {
+        try {
+            Files.deleteIfExists(resolve(relativePath));
+        } catch (IOException ignored) {
+            // Metadata is authoritative; stale files can be cleaned by maintenance jobs.
+        }
+    }
+
+    public boolean hasPublicBaseUrl() {
+        return StringUtils.hasText(properties.getStorage().getPublicBaseUrl());
+    }
+
+    public String buildExecutionFileUrl(String taskId, String fileId, boolean publicUrl) {
+        String baseUrl = publicUrl
+                ? properties.getStorage().getPublicBaseUrl()
+                : properties.getStorage().getInternalBaseUrl();
+        if (!StringUtils.hasText(baseUrl)) {
+            throw new IllegalStateException(publicUrl ? "未配置 APP_PUBLIC_BASE_URL" : "未配置 APP_INTERNAL_BASE_URL");
+        }
+        return UriComponentsBuilder.fromUriString(baseUrl.replaceAll("/$", ""))
+                .pathSegment("execution-tasks", taskId, "files", fileId)
+                .build()
+                .encode()
+                .toUriString();
+    }
+
     public String buildDownloadUrl(String fileName) {
         String baseUrl = properties.getStorage().getPublicBaseUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
-            return "/files/download?fileName=" + fileName;
+            return UriComponentsBuilder.fromPath("/files/download")
+                    .queryParam("fileName", fileName)
+                    .build()
+                    .encode()
+                    .toUriString();
         }
-        return baseUrl.replaceAll("/$", "") + "/files/download?fileName=" + fileName;
+        return UriComponentsBuilder.fromUriString(baseUrl.replaceAll("/$", ""))
+                .path("/files/download")
+                .queryParam("fileName", fileName)
+                .build()
+                .encode()
+                .toUriString();
     }
 }
