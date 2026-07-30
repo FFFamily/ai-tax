@@ -1,82 +1,81 @@
 package com.rcszh.tax.dto.executiontask;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
+/** 内部解析任务项结果。 */
 @Data
-@Schema(description = "内部解析任务项结果")
 public class ExecutionTaskResultItemResponse {
-    @Schema(description = "内部解析任务项 ID")
+    /** 内部解析任务项 ID。 */
     private String id;
 
+    /** 内部解析任务 ID。 */
     @JsonProperty("task_id")
-    @Schema(description = "内部解析任务 ID")
     private String taskId;
 
+    /** 显式指定的文档模板 ID。 */
     @JsonProperty("document_id")
-    @Schema(description = "显式指定的文档模板 ID")
     private String documentId;
 
+    /** 请求的文档类型。 */
     @JsonProperty("requested_document_type")
-    @Schema(description = "请求的文档类型")
     private String requestedDocumentType;
 
+    /** 路由后采用的文档模板 ID。 */
     @JsonProperty("resolved_document_id")
-    @Schema(description = "路由后采用的文档模板 ID")
     private String resolvedDocumentId;
 
+    /** 路由变体。 */
     @JsonProperty("route_variant")
-    @Schema(description = "路由变体")
     private String routeVariant;
 
+    /** 路由置信度。 */
     @JsonProperty("route_confidence")
-    @Schema(description = "路由置信度")
     private BigDecimal routeConfidence;
 
+    /** 路由原因原文。 */
     @JsonProperty("route_reason")
-    @Schema(description = "路由原因原文")
     private String routeReason;
 
+    /** 是否需要人工复核。 */
     @JsonProperty("need_human_review")
-    @Schema(description = "是否需要人工复核")
     private Boolean needHumanReview;
 
+    /** PDF 或图片对应的远程解析任务 ID。 */
     @JsonProperty("remote_task_id")
-    @Schema(description = "PDF 或图片对应的远程解析任务 ID")
     private String remoteTaskId;
 
+    /** 文档原始解析结果 JSON。 */
     @JsonProperty("task_result")
-    @Schema(description = "文档原始解析结果 JSON")
     private String taskResult;
 
+    /** 待解析文件地址。 */
     @JsonProperty("file_url")
-    @Schema(description = "待解析文件地址")
     private String fileUrl;
 
+    /** 文件解析状态。 */
     @JsonProperty("parse_status")
-    @Schema(description = "文件解析状态")
     private String parseStatus;
 
+    /** 结构化处理结果 JSON。 */
     @JsonProperty("change_result")
-    @Schema(description = "结构化处理结果 JSON")
     private String changeResult;
 
+    /** 表格解析结果 JSON。 */
     @JsonProperty("table_result")
-    @Schema(description = "表格解析结果 JSON")
     private String tableResult;
 
+    /** 文件识别规则。 */
     @JsonProperty("file_rule")
-    @Schema(description = "文件识别规则")
     private String fileRule;
 
+    /** 人工复核原因。 */
     @JsonProperty("review_reasons")
-    @Schema(description = "人工复核原因")
     private String reviewReasons;
 
+    /** 文档路由摘要。 */
     @JsonProperty("route_summary")
-    @Schema(description = "文档路由摘要")
     private ExecutionTaskRouteSummaryResponse routeSummary;
 }
