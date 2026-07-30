@@ -40,3 +40,4 @@ build/
 !**/src/main/resources/application-local.yml
 
 log.path_IS_UNDEFINED
+src/main/resources/application-local.yaml
