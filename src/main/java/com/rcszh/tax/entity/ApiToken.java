@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_api_token")
 public class ApiToken {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
     private String provider;
     private String token;
     private Boolean enabled;

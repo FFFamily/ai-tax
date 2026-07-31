@@ -10,16 +10,16 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_execution_task_file")
 public class TaxExecutionTaskFile {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String executionTaskId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long executionTaskId;
     private String materialType;
     private String originalFileName;
     private String storagePath;
     private String contentType;
     private String extension;
     private Long sizeBytes;
-    private String parseTaskItemId;
+    private Long parseTaskItemId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

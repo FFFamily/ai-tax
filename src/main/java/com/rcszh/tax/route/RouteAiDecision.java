@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 public class RouteAiDecision {
-    private String documentId;
+    private Long documentId;
     private BigDecimal confidence;
     private boolean needHumanReview;
     private List<String> reasons = new ArrayList<>();

@@ -9,15 +9,15 @@ import java.math.BigDecimal;
 @Data
 public class ExecutionTaskResultItemResponse {
     /** 内部解析任务项 ID。 */
-    private String id;
+    private Long id;
 
     /** 内部解析任务 ID。 */
     @JsonProperty("task_id")
-    private String taskId;
+    private Long taskId;
 
     /** 显式指定的文档模板 ID。 */
     @JsonProperty("document_id")
-    private String documentId;
+    private Long documentId;
 
     /** 请求的文档类型。 */
     @JsonProperty("requested_document_type")
@@ -25,7 +25,7 @@ public class ExecutionTaskResultItemResponse {
 
     /** 路由后采用的文档模板 ID。 */
     @JsonProperty("resolved_document_id")
-    private String resolvedDocumentId;
+    private Long resolvedDocumentId;
 
     /** 路由变体。 */
     @JsonProperty("route_variant")

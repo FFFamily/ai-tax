@@ -155,7 +155,7 @@ public class ExecutionTaskService {
      * @param taskId 执行任务 ID
      * @return 任务详情
      */
-    public ExecutionTaskDetailResponse get(String taskId) {
+    public ExecutionTaskDetailResponse get(Long taskId) {
         TaxExecutionTask task = requireTask(taskId);
         return detail(task, listFiles(taskId));
     }
@@ -169,7 +169,7 @@ public class ExecutionTaskService {
      * @return 上传后的任务详情
      */
     @Transactional(rollbackFor = Exception.class)
-    public ExecutionTaskDetailResponse upload(String taskId,
+    public ExecutionTaskDetailResponse upload(Long taskId,
                                               String materialTypeCode,
                                               List<MultipartFile> uploads) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
@@ -189,7 +189,6 @@ public class ExecutionTaskService {
             for (MultipartFile upload : uploads) {
                 ValidatedFile validated = validateFile(upload);
                 TaxExecutionTaskFile file = new TaxExecutionTaskFile();
-                file.setId(com.baomidou.mybatisplus.core.toolkit.IdWorker.get32UUID());
                 file.setExecutionTaskId(taskId);
                 file.setMaterialType(materialType.name());
                 file.setOriginalFileName(validated.originalName());
@@ -198,12 +197,14 @@ public class ExecutionTaskService {
                 file.setSizeBytes(upload.getSize());
                 file.setCreatedAt(LocalDateTime.now());
                 file.setUpdatedAt(file.getCreatedAt());
+                file.setStoragePath("");
+                fileMapper.insert(file);
                 String storagePath = "execution-tasks/%s/%s/%s.%s".formatted(
                         taskId, materialType.name(), file.getId(), validated.extension());
                 storageService.store(upload, storagePath);
                 storedPaths.add(storagePath);
                 file.setStoragePath(storagePath);
-                fileMapper.insert(file);
+                fileMapper.updateById(file);
             }
         } catch (IOException exception) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "文件保存失败: " + exception.getMessage());
@@ -218,7 +219,7 @@ public class ExecutionTaskService {
      * @param fileId 文件记录 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteFile(String taskId, String fileId) {
+    public void deleteFile(Long taskId, Long fileId) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
         requireCollecting(task);
         TaxExecutionTaskFile file = requireFile(taskId, fileId);
@@ -242,7 +243,7 @@ public class ExecutionTaskService {
      * @param fileId 文件记录 ID
      * @return 文件下载信息
      */
-    public FileDownload download(String taskId, String fileId) {
+    public FileDownload download(Long taskId, Long fileId) {
         TaxExecutionTaskFile file = requireFile(taskId, fileId);
         Path path = storageService.resolve(file.getStoragePath());
         if (!java.nio.file.Files.isRegularFile(path)) {
@@ -259,9 +260,9 @@ public class ExecutionTaskService {
      * @return 提交后的任务详情
      */
     @Transactional(rollbackFor = Exception.class)
-    public ExecutionTaskDetailResponse submit(String taskId) {
+    public ExecutionTaskDetailResponse submit(Long taskId) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
-        if (StringUtils.hasText(task.getParseTaskId())) {
+        if (task.getParseTaskId() != null) {
             return detail(task, listFiles(taskId));
         }
         requireCollecting(task);
@@ -309,9 +310,9 @@ public class ExecutionTaskService {
      * @param taskId 执行任务 ID
      * @return 内部解析任务及文件项结果
      */
-    public ExecutionTaskResultResponse result(String taskId) {
+    public ExecutionTaskResultResponse result(Long taskId) {
         TaxExecutionTask task = requireTask(taskId);
-        if (!StringUtils.hasText(task.getParseTaskId())) {
+        if (task.getParseTaskId() == null) {
             throw BusinessException.conflict("任务尚未提交处理");
         }
         ExecutionTaskResultResponse result = documentTaskServer.getExecutionTaskResultById(task.getParseTaskId());
@@ -414,7 +415,7 @@ public class ExecutionTaskService {
     /**
      * 按上传时间查询任务下的全部材料文件。
      */
-    private List<TaxExecutionTaskFile> listFiles(String taskId) {
+    private List<TaxExecutionTaskFile> listFiles(Long taskId) {
         return fileMapper.selectList(new LambdaQueryWrapper<TaxExecutionTaskFile>()
                 .eq(TaxExecutionTaskFile::getExecutionTaskId, taskId)
                 .orderByAsc(TaxExecutionTaskFile::getCreatedAt)
@@ -424,7 +425,7 @@ public class ExecutionTaskService {
     /**
      * 查询任务，不存在时返回业务层 404 异常。
      */
-    private TaxExecutionTask requireTask(String taskId) {
+    private TaxExecutionTask requireTask(Long taskId) {
         TaxExecutionTask task = taskMapper.selectById(taskId);
         if (task == null) {
             throw BusinessException.notFound("任务不存在");
@@ -435,7 +436,7 @@ public class ExecutionTaskService {
     /**
      * 使用行锁查询任务，串行化上传、删除和提交等状态变更。
      */
-    private TaxExecutionTask requireTaskForUpdate(String taskId) {
+    private TaxExecutionTask requireTaskForUpdate(Long taskId) {
         TaxExecutionTask task = taskMapper.selectOne(new LambdaQueryWrapper<TaxExecutionTask>()
                 .eq(TaxExecutionTask::getId, taskId)
                 .last("FOR UPDATE"));
@@ -448,7 +449,7 @@ public class ExecutionTaskService {
     /**
      * 校验文件属于指定任务并返回文件记录。
      */
-    private TaxExecutionTaskFile requireFile(String taskId, String fileId) {
+    private TaxExecutionTaskFile requireFile(Long taskId, Long fileId) {
         TaxExecutionTaskFile file = fileMapper.selectOne(new LambdaQueryWrapper<TaxExecutionTaskFile>()
                 .eq(TaxExecutionTaskFile::getId, fileId)
                 .eq(TaxExecutionTaskFile::getExecutionTaskId, taskId));

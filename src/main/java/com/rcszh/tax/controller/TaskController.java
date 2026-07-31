@@ -34,13 +34,13 @@ public class TaskController {
     }
 
     @PostMapping
-    public ApiResponse<Map<String, String>> createTask(@RequestBody CreateDocumentTaskDto request) {
-        String taskId = taskExecutionService.createAndStartTask(request);
+    public ApiResponse<Map<String, Long>> createTask(@RequestBody CreateDocumentTaskDto request) {
+        Long taskId = taskExecutionService.createAndStartTask(request);
         return ApiResponse.success(Map.of("taskId", taskId));
     }
 
     @GetMapping("/{taskId}")
-    public ApiResponse<Map<String, Object>> getTask(@PathVariable String taskId) {
+    public ApiResponse<Map<String, Object>> getTask(@PathVariable Long taskId) {
         Map<String, Object> task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             return ApiResponse.error("任务不存在");
@@ -49,7 +49,7 @@ public class TaskController {
     }
 
     @PutMapping("/items/{itemId}/review")
-    public ApiResponse<Map<String, Object>> reviewTaskItem(@PathVariable String itemId,
+    public ApiResponse<Map<String, Object>> reviewTaskItem(@PathVariable Long itemId,
                                                            @RequestBody TaskItemReviewRequest request) {
         Map<String, Object> item = taskReviewService.reviewTaskItem(itemId, request);
         if (item == null) {

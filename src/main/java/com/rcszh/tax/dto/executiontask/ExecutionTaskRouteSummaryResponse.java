@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 public class ExecutionTaskRouteSummaryResponse {
     /** 最终采用的文档模板 ID。 */
-    private String documentId;
+    private Long documentId;
 
     /** 请求的文档类型。 */
     private String documentType;

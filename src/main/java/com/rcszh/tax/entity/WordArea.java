@@ -1,5 +1,6 @@
 package com.rcszh.tax.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -7,7 +8,7 @@ import lombok.Data;
 @Data
 @TableName("tax_word_area")
 public class WordArea {
-    @TableId
+    @TableId(type = IdType.AUTO)
     private Long id;
     private Long parentId;
     private String label;

@@ -83,19 +83,20 @@ public abstract class BaseParser {
         return parseResult;
     }
 
-    protected String resolveDocumentId(Map<String, Object> info,
+    protected Long resolveDocumentId(Map<String, Object> info,
                                        ParsePreparationResult preparation,
                                        String fileType,
                                        DocumentRouter documentRouter) {
         Object configuredDocumentId = info.get(DocumentTaskServer.Item.DOCUMENT_ID);
         if (configuredDocumentId != null && !configuredDocumentId.toString().isBlank()) {
             // 用户显式指定模板时直接走人工路由结果，并将路由说明写回任务项供审计使用。
-            info.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, configuredDocumentId.toString());
+            Long documentId = toLong(configuredDocumentId);
+            info.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, documentId);
             info.put(DocumentTaskServer.Item.ROUTE_CONFIDENCE, BigDecimal.ONE);
             info.put(DocumentTaskServer.Item.ROUTE_REASON, "使用显式指定的文档模板");
             info.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, Boolean.FALSE);
             info.put(DocumentTaskServer.Item.ROUTE_SUMMARY, buildRouteSummary(
-                    configuredDocumentId.toString(),
+                    documentId,
                     (String) info.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE),
                     "",
                     BigDecimal.ONE,
@@ -103,7 +104,7 @@ public abstract class BaseParser {
                     "manual",
                     List.of("使用显式指定的文档模板")
             ));
-            return configuredDocumentId.toString();
+            return documentId;
         }
         DocumentRouteContext routeContext = new DocumentRouteContext();
         routeContext.setRequestedDocumentType((String) info.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE));
@@ -112,7 +113,7 @@ public abstract class BaseParser {
         routeContext.setDocumentFeatures(preparation.getDocumentFeatures());
         // 未显式指定模板时，依赖预处理提取到的关键词、表头、机构名等特征完成文档路由。
         DocumentRouteResult routeResult = documentRouter.route(routeContext);
-        if (routeResult == null || routeResult.getDocumentId() == null || routeResult.getDocumentId().isBlank()) {
+        if (routeResult == null || routeResult.getDocumentId() == null) {
             throw new RuntimeException("未找到匹配的文档模板");
         }
         info.put(DocumentTaskServer.Item.DOCUMENT_ID, routeResult.getDocumentId());
@@ -137,7 +138,7 @@ public abstract class BaseParser {
         return routeResult.getDocumentId();
     }
 
-    private Map<String, Object> buildRouteSummary(String documentId,
+    private Map<String, Object> buildRouteSummary(Long documentId,
                                                   String documentType,
                                                   String variant,
                                                   BigDecimal confidence,
@@ -154,5 +155,12 @@ public abstract class BaseParser {
         routeSummary.put("routeSource", routeSource == null ? "rule" : routeSource);
         routeSummary.put("reasons", reasons == null ? List.of() : reasons);
         return routeSummary;
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(value.toString());
     }
 }

@@ -47,7 +47,7 @@ public class PDFParser extends BaseParser{
         parseResults.forEach(i -> i.setPageIndex(i.getPage_idx()));
         // 预处理阶段把 OCR 结果转换成可路由、可后处理的标准化中间表示。
         ParsePreparationResult preparation = parsePreparationService.preparePdf(parseResults);
-        String documentId = resolveDocumentId(info, preparation, "pdf", documentRouter);
+        Long documentId = resolveDocumentId(info, preparation, "pdf", documentRouter);
         logger.info("对应的文档Id：{}", documentId);
         Map<String, Object> document = documentServer.getDocument(documentId);
         if (document == null) {

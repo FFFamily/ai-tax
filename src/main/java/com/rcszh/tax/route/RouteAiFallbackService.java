@@ -88,12 +88,12 @@ public class RouteAiFallbackService {
             item.put("variant", candidate.get("variant"));
             item.put("matchRule", candidate.get("matchRule"));
             item.put("learnedKeywords", reviewLearningService.listSuggestedKeywords(
-                    (String) candidate.get("id"),
+                    (Long) candidate.get("id"),
                     (String) candidate.get("type"),
                     8
             ));
             item.put("fewShotExamples", reviewLearningService.listFewShotExamples(
-                    (String) candidate.get("id"),
+                    (Long) candidate.get("id"),
                     (String) candidate.get("type"),
                     2
             ));
@@ -144,7 +144,7 @@ public class RouteAiFallbackService {
             return null;
         }
         RouteAiDecision decision = new RouteAiDecision();
-        decision.setDocumentId(documentId);
+        decision.setDocumentId(Long.valueOf(documentId));
         Object confidence = object.get("confidence");
         decision.setConfidence(confidence == null ? new BigDecimal("0.50") : new BigDecimal(confidence.toString()));
         decision.setNeedHumanReview(object.getBool("needHumanReview", Boolean.TRUE));

@@ -17,21 +17,21 @@ class ExecutionTaskResultResponseTest {
         routeSummary.setVariant("GENERIC");
 
         ExecutionTaskResultItemResponse item = new ExecutionTaskResultItemResponse();
-        item.setId("item-1");
-        item.setTaskId("parse-1");
+        item.setId(2L);
+        item.setTaskId(1L);
         item.setChangeResult("{\"records\":[]}");
         item.setNeedHumanReview(Boolean.TRUE);
         item.setRouteSummary(routeSummary);
 
         ExecutionTaskResultResponse response = new ExecutionTaskResultResponse();
-        response.setId("parse-1");
+        response.setId(1L);
         response.setStatus("SUCCESS");
         response.setItems(List.of(item));
 
         JsonNode json = objectMapper.valueToTree(response);
         JsonNode resultItem = json.path("items").path(0);
 
-        assertThat(resultItem.path("task_id").asText()).isEqualTo("parse-1");
+        assertThat(resultItem.path("task_id").asLong()).isEqualTo(1L);
         assertThat(resultItem.path("change_result").asText()).isEqualTo("{\"records\":[]}");
         assertThat(resultItem.path("need_human_review").asBoolean()).isTrue();
         assertThat(resultItem.path("route_summary").path("variant").asText()).isEqualTo("GENERIC");

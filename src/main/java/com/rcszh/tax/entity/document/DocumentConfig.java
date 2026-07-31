@@ -10,9 +10,9 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_document_config")
 public class DocumentConfig {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String documentId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long documentId;
     private String titleFilter;
     private String tableHeadCheckRule;
     private Integer sortNum;

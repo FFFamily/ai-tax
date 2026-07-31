@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 public class DocumentRouteResult {
-    private String documentId;
+    private Long documentId;
     private String documentType;
     private String variant;
     private BigDecimal confidence;

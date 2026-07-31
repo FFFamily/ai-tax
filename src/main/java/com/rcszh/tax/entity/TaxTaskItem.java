@@ -10,12 +10,12 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_task_item")
 public class TaxTaskItem {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String taskId;
-    private String documentId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long taskId;
+    private Long documentId;
     private String requestedDocumentType;
-    private String resolvedDocumentId;
+    private Long resolvedDocumentId;
     private String routeVariant;
     private java.math.BigDecimal routeConfidence;
     private String routeReason;

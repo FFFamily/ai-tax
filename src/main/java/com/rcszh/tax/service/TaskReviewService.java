@@ -25,7 +25,7 @@ public class TaskReviewService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> reviewTaskItem(String itemId, TaskItemReviewRequest request) {
+    public Map<String, Object> reviewTaskItem(Long itemId, TaskItemReviewRequest request) {
         Map<String, Object> item = documentTaskServer.getTaskItemById(itemId);
         if (item == null) {
             return null;
@@ -45,8 +45,8 @@ public class TaskReviewService {
 
         item.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, needHumanReview);
         item.put(DocumentTaskServer.Item.REVIEW_REASONS, reviewReasons.stream().distinct().toList());
-        if (request.getResolvedDocumentId() != null && !request.getResolvedDocumentId().isBlank()) {
-            item.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, request.getResolvedDocumentId().trim());
+        if (request.getResolvedDocumentId() != null) {
+            item.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, request.getResolvedDocumentId());
         }
 
         Object changeResult = item.get(DocumentTaskServer.Item.CHANGE_RESULT);
@@ -79,8 +79,8 @@ public class TaskReviewService {
         if (request.getComment() != null && !request.getComment().isBlank()) {
             globalParam.set("reviewComment", request.getComment().trim());
         }
-        if (request.getResolvedDocumentId() != null && !request.getResolvedDocumentId().isBlank()) {
-            globalParam.set("resolvedDocumentId", request.getResolvedDocumentId().trim());
+        if (request.getResolvedDocumentId() != null) {
+            globalParam.set("resolvedDocumentId", request.getResolvedDocumentId());
         }
 
         item.put(DocumentTaskServer.Item.CHANGE_RESULT, root.toString());

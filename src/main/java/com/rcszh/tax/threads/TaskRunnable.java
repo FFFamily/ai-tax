@@ -18,14 +18,14 @@ import java.util.Map;
 public class TaskRunnable implements Runnable {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TaskRunnable.class);
 
-    private final String taskId;
+    private final Long taskId;
     private final DocumentTaskServer documentTaskServer;
     private final DocumentServer documentServer;
     private final PDFParser pdfParser;
     private final ExcelParser excelParser;
     private final RecordPostProcessService recordPostProcessService;
 
-    public TaskRunnable(String taskId,
+    public TaskRunnable(Long taskId,
                         DocumentTaskServer documentTaskServer,
                         DocumentServer documentServer,
                         PDFParser pdfParser,
@@ -87,9 +87,9 @@ public class TaskRunnable implements Runnable {
                 } else {
                     parserResult = pdfParser.doParse(item);
                 }
-                String resolvedDocumentId = (String) item.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID);
-                if (StrUtil.isBlank(resolvedDocumentId)) {
-                    resolvedDocumentId = (String) item.get(DocumentTaskServer.Item.DOCUMENT_ID);
+                Long resolvedDocumentId = toLong(item.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID));
+                if (resolvedDocumentId == null) {
+                    resolvedDocumentId = toLong(item.get(DocumentTaskServer.Item.DOCUMENT_ID));
                 }
                 logger.info("后处理使用的文档Id：{}", resolvedDocumentId);
                 Map<String, Object> document = documentServer.getDocument(resolvedDocumentId);
@@ -112,5 +112,15 @@ public class TaskRunnable implements Runnable {
         oldTask.put(DocumentTaskServer.STATUS, RunTaskStatusEnum.SUCCESS.getStatus());
         documentTaskServer.updateTask(oldTask);
         logger.info("异步任务执行完成");
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(value.toString());
     }
 }

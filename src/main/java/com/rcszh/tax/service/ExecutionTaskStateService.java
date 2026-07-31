@@ -22,7 +22,7 @@ public class ExecutionTaskStateService {
      *
      * @param executionTaskId 执行任务 ID，为空时忽略
      */
-    public void markCompleted(String executionTaskId) {
+    public void markCompleted(Long executionTaskId) {
         if (executionTaskId == null) {
             return;
         }
@@ -38,7 +38,7 @@ public class ExecutionTaskStateService {
      * @param executionTaskId 执行任务 ID，为空时忽略
      * @param message 解析失败原因
      */
-    public void markFailed(String executionTaskId, String message) {
+    public void markFailed(Long executionTaskId, String message) {
         if (executionTaskId == null) {
             return;
         }

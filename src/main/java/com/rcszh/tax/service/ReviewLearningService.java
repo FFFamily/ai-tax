@@ -36,13 +36,13 @@ public class ReviewLearningService {
         }
         // 每次人工复核都落成一条 learning 记录，把“纠错结果”转成后续可复用的机器线索。
         ReviewLearning learning = new ReviewLearning();
-        learning.setTaskItemId(String.valueOf(taskItem.get(DocumentTaskServer.Item.FIELD_ID)));
+        learning.setTaskItemId(toLong(taskItem.get(DocumentTaskServer.Item.FIELD_ID)));
         Object taskId = taskItem.get("task_id");
         if (taskId != null) {
-            learning.setTaskId(String.valueOf(taskId));
+            learning.setTaskId(toLong(taskId));
         }
         learning.setRequestedDocumentType((String) taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE));
-        learning.setResolvedDocumentId((String) taskItem.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID));
+        learning.setResolvedDocumentId(toLong(taskItem.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID)));
         learning.setRouteSummary(JSONUtil.toJsonStr(taskItem.get(DocumentTaskServer.Item.ROUTE_SUMMARY)));
         learning.setReviewReasons(JSONUtil.toJsonStr(taskItem.get(DocumentTaskServer.Item.REVIEW_REASONS)));
         learning.setReviewedRecords(JSONUtil.toJsonStr(reviewedRecords));
@@ -67,7 +67,7 @@ public class ReviewLearningService {
                 .toList();
     }
 
-    public List<String> listSuggestedKeywords(String resolvedDocumentId,
+    public List<String> listSuggestedKeywords(Long resolvedDocumentId,
                                               String requestedDocumentType,
                                               int limit) {
         if (reviewLearningMapper == null) {
@@ -89,7 +89,7 @@ public class ReviewLearningService {
                 .toList();
     }
 
-    public List<Map<String, Object>> listFewShotExamples(String resolvedDocumentId,
+    public List<Map<String, Object>> listFewShotExamples(Long resolvedDocumentId,
                                                          String requestedDocumentType,
                                                          int limit) {
         if (reviewLearningMapper == null) {
@@ -166,11 +166,11 @@ public class ReviewLearningService {
         return example;
     }
 
-    private List<ReviewLearning> queryLearnings(String resolvedDocumentId,
+    private List<ReviewLearning> queryLearnings(Long resolvedDocumentId,
                                                 String requestedDocumentType,
                                                 int limit) {
         LambdaQueryWrapper<ReviewLearning> wrapper = new LambdaQueryWrapper<>();
-        if (StrUtil.isNotBlank(resolvedDocumentId)) {
+        if (resolvedDocumentId != null) {
             wrapper.eq(ReviewLearning::getResolvedDocumentId, resolvedDocumentId);
         }
         if (StrUtil.isNotBlank(requestedDocumentType)) {
@@ -182,6 +182,16 @@ public class ReviewLearningService {
             return List.of();
         }
         return learnings.stream().limit(Math.max(limit, 1)).toList();
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(value.toString());
     }
 
     private void collectKeyword(Collection<String> target, Object value) {

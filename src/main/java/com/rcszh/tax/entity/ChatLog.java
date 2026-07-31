@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 @Setter
 @TableName("tax_chat_log")
 public class ChatLog {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
     private String prompt;
     private String result;
     private Integer token;

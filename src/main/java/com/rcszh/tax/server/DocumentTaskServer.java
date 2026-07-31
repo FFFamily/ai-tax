@@ -64,7 +64,7 @@ public class DocumentTaskServer {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public String createTask(CreateDocumentTaskDto dto) {
+    public Long createTask(CreateDocumentTaskDto dto) {
         return createTaskWithItems(dto).taskId();
     }
 
@@ -73,7 +73,7 @@ public class DocumentTaskServer {
         TaxTask task = new TaxTask();
         task.setStatus(RunTaskStatusEnum.RUNNING.getStatus());
         taxTaskMapper.insert(task);
-        List<String> itemIds = new java.util.ArrayList<>();
+        List<Long> itemIds = new java.util.ArrayList<>();
         if (dto.getItems() != null) {
             for (CreateDocumentTaskDto.Item source : dto.getItems()) {
                 TaxTaskItem item = new TaxTaskItem();
@@ -90,11 +90,11 @@ public class DocumentTaskServer {
         return new CreatedTask(task.getId(), List.copyOf(itemIds));
     }
 
-    public record CreatedTask(String taskId, List<String> itemIds) {
+    public record CreatedTask(Long taskId, List<Long> itemIds) {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> getTaskAndItemById(String id) {
+    public Map<String, Object> getTaskAndItemById(Long id) {
         TaxTask task = taxTaskMapper.selectById(id);
         if (task == null) {
             return null;
@@ -114,7 +114,7 @@ public class DocumentTaskServer {
      * @return 内部解析任务结果，不存在时返回 null
      */
     @Transactional(rollbackFor = Exception.class)
-    public ExecutionTaskResultResponse getExecutionTaskResultById(String id) {
+    public ExecutionTaskResultResponse getExecutionTaskResultById(Long id) {
         TaxTask task = taxTaskMapper.selectById(id);
         if (task == null) {
             return null;
@@ -129,13 +129,13 @@ public class DocumentTaskServer {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> getTaskById(String id) {
+    public Map<String, Object> getTaskById(Long id) {
         TaxTask task = taxTaskMapper.selectById(id);
         return task == null ? null : toTaskMap(task);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> getTaskItemById(String itemId) {
+    public Map<String, Object> getTaskItemById(Long itemId) {
         TaxTaskItem item = taxTaskItemMapper.selectById(itemId);
         return item == null ? null : toTaskItemMap(item);
     }
@@ -147,7 +147,7 @@ public class DocumentTaskServer {
 
     public void updateTask(Map<String, Object> task) {
         TaxTask taxTask = new TaxTask();
-        taxTask.setId((String) task.get(ID));
+        taxTask.setId(toLong(task.get(ID)));
         taxTask.setStatus((String) task.get(STATUS));
         taxTaskMapper.updateById(taxTask);
     }
@@ -280,11 +280,11 @@ public class DocumentTaskServer {
 
     private TaxTaskItem fromTaskItemMap(Map<String, Object> taskItem) {
         TaxTaskItem item = new TaxTaskItem();
-        item.setId((String) taskItem.get(Item.FIELD_ID));
-        item.setTaskId((String) taskItem.get(Item.TASK_ID));
-        item.setDocumentId((String) taskItem.get(Item.DOCUMENT_ID));
+        item.setId(toLong(taskItem.get(Item.FIELD_ID)));
+        item.setTaskId(toLong(taskItem.get(Item.TASK_ID)));
+        item.setDocumentId(toLong(taskItem.get(Item.DOCUMENT_ID)));
         item.setRequestedDocumentType((String) taskItem.get(Item.REQUESTED_DOCUMENT_TYPE));
-        item.setResolvedDocumentId((String) taskItem.get(Item.RESOLVED_DOCUMENT_ID));
+        item.setResolvedDocumentId(toLong(taskItem.get(Item.RESOLVED_DOCUMENT_ID)));
         item.setRouteVariant((String) taskItem.get(Item.ROUTE_VARIANT));
         Object routeConfidence = taskItem.get(Item.ROUTE_CONFIDENCE);
         if (routeConfidence != null) {
@@ -309,5 +309,15 @@ public class DocumentTaskServer {
             item.setReviewReasons(JSONUtil.toJsonStr(reviewReasons));
         }
         return item;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(value.toString());
     }
 }

@@ -10,12 +10,12 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_review_learning")
 public class ReviewLearning {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String taskId;
-    private String taskItemId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long taskId;
+    private Long taskItemId;
     private String requestedDocumentType;
-    private String resolvedDocumentId;
+    private Long resolvedDocumentId;
     private String routeSummary;
     private String reviewReasons;
     private String reviewedRecords;

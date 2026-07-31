@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
@@ -104,7 +105,7 @@ public class ExecutionTaskController {
     @GetMapping("/{taskId}")
     public ApiResponse<ExecutionTaskDetailResponse> get(
             @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId) {
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId) {
         return ApiResponse.success(executionTaskService.get(taskId));
     }
 
@@ -120,7 +121,7 @@ public class ExecutionTaskController {
     @PostMapping(path = "/{taskId}/materials/{materialType}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ExecutionTaskDetailResponse> upload(
             @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId,
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId,
             @Parameter(description = "材料类型编码，必须属于该任务的所得类型", required = true,
                     example = "SALARY_PAYMENT_DETAIL")
             @PathVariable("materialType") @NotBlank(message = "材料类型不能为空") String materialType,
@@ -140,9 +141,9 @@ public class ExecutionTaskController {
     @DeleteMapping("/{taskId}/files/{fileId}")
     public ApiResponse<Void> deleteFile(
             @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId,
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId,
             @Parameter(description = "待删除的材料文件记录 ID", required = true)
-            @PathVariable("fileId") @NotBlank(message = "文件 ID 不能为空") String fileId) {
+            @PathVariable("fileId") @Positive(message = "文件 ID 必须为正数") Long fileId) {
         executionTaskService.deleteFile(taskId, fileId);
         return ApiResponse.success();
     }
@@ -159,9 +160,9 @@ public class ExecutionTaskController {
     @GetMapping("/{taskId}/files/{fileId}")
     public ResponseEntity<InputStreamResource> download(
             @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId,
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId,
             @Parameter(description = "待下载的材料文件记录 ID", required = true)
-            @PathVariable("fileId") @NotBlank(message = "文件 ID 不能为空") String fileId) throws IOException {
+            @PathVariable("fileId") @Positive(message = "文件 ID 必须为正数") Long fileId) throws IOException {
         ExecutionTaskService.FileDownload file = executionTaskService.download(taskId, fileId);
         MediaType mediaType;
         try {
@@ -188,7 +189,7 @@ public class ExecutionTaskController {
     @PostMapping("/{taskId}/submit")
     public ApiResponse<ExecutionTaskDetailResponse> submit(
             @Parameter(description = "待提交的用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId) {
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId) {
         return ApiResponse.success(executionTaskService.submit(taskId));
     }
 
@@ -202,7 +203,7 @@ public class ExecutionTaskController {
     @GetMapping("/{taskId}/result")
     public ApiResponse<ExecutionTaskResultResponse> result(
             @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @NotBlank(message = "任务 ID 不能为空") String taskId) {
+            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId) {
         return ApiResponse.success(executionTaskService.result(taskId));
     }
 }

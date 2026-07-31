@@ -11,7 +11,7 @@ import java.util.List;
 @Data
 public class DocumentResult {
     // 文档id
-    private String documentId;
+    private Long documentId;
     // 文档名称
     private String documentName;
     // 是否解析成功

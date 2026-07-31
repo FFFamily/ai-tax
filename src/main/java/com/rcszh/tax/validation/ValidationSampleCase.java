@@ -13,7 +13,7 @@ public class ValidationSampleCase {
     private String name;
     private String requestedDocumentType;
     private String fileType;
-    private String expectedDocumentId;
+    private Long expectedDocumentId;
     private Integer expectedDividendCandidateCount;
     private Integer expectedDividendExtractCount;
     private Boolean expectNeedHumanReview;

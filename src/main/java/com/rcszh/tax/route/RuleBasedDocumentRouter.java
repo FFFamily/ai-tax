@@ -48,7 +48,7 @@ public class RuleBasedDocumentRouter implements DocumentRouter {
             if (candidateScore.score().compareTo(bestScore) > 0) {
                 bestScore = candidateScore.score();
                 bestResult = new DocumentRouteResult();
-                bestResult.setDocumentId((String) candidate.get(DocumentServer.ID_KEY));
+                bestResult.setDocumentId((Long) candidate.get(DocumentServer.ID_KEY));
                 bestResult.setDocumentType((String) candidate.get(DocumentServer.TYPE));
                 bestResult.setVariant((String) candidate.get(DocumentServer.VARIANT));
                 bestResult.setConfidence(candidateScore.score());
@@ -71,7 +71,7 @@ public class RuleBasedDocumentRouter implements DocumentRouter {
                                                       DocumentRouteResult currentRuleResult) {
         // AI 兜底不是替代规则，而是在低置信场景补充判断并保留规则命中原因。
         RouteAiDecision decision = routeAiFallbackService.decide(context, candidates);
-        if (decision == null || StrUtil.isBlank(decision.getDocumentId())) {
+        if (decision == null || decision.getDocumentId() == null) {
             return currentRuleResult;
         }
         Map<String, Object> matchedCandidate = candidates.stream()
@@ -113,7 +113,7 @@ public class RuleBasedDocumentRouter implements DocumentRouter {
         List<String> headers = flattenHeaders(context.getDocumentFeatures());
         // 复核沉淀出来的关键词会进入路由打分，实现“人工纠正一次，后续自动受益”。
         List<String> learnedKeywords = reviewLearningService.listSuggestedKeywords(
-                (String) candidate.get(DocumentServer.ID_KEY),
+                (Long) candidate.get(DocumentServer.ID_KEY),
                 candidateType,
                 12
         );

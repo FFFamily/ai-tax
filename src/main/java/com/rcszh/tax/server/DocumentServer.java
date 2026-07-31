@@ -93,7 +93,7 @@ public class DocumentServer {
         sb.append(StrUtil.isNotBlank(desc) ? desc : label);
     }
 
-    public Map<String, Object> getDocument(String id) {
+    public Map<String, Object> getDocument(Long id) {
         MaterialDocument document = materialDocumentMapper.selectById(id);
         if (document == null) {
             return null;
@@ -123,7 +123,7 @@ public class DocumentServer {
                 .toList();
     }
 
-    public List<Map<String, Object>> getRules(String documentId) {
+    public List<Map<String, Object>> getRules(Long documentId) {
         List<DocumentConfig> rules = documentConfigMapper.selectList(new LambdaQueryWrapper<DocumentConfig>()
                 .eq(DocumentConfig::getDocumentId, documentId)
                 .orderByAsc(DocumentConfig::getSortNum));
@@ -138,7 +138,7 @@ public class DocumentServer {
         return result;
     }
 
-    public List<Map<String, Object>> getMapping(String documentId) {
+    public List<Map<String, Object>> getMapping(Long documentId) {
         List<DocumentFieldMapping> mappings = documentFieldMappingMapper.selectList(new LambdaQueryWrapper<DocumentFieldMapping>()
                 .eq(DocumentFieldMapping::getDocumentId, documentId)
                 .orderByAsc(DocumentFieldMapping::getSortNum));

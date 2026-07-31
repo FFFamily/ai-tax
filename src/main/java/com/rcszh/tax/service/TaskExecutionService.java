@@ -15,8 +15,8 @@ public class TaskExecutionService {
         this.asyncRunner = asyncRunner;
     }
 
-    public String createAndStartTask(CreateDocumentTaskDto dto) {
-        String taskId = documentTaskServer.createTask(dto);
+    public Long createAndStartTask(CreateDocumentTaskDto dto) {
+        Long taskId = documentTaskServer.createTask(dto);
         asyncRunner.start(taskId, null);
         return taskId;
     }

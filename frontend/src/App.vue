@@ -121,8 +121,8 @@ async function loadResult(quiet = false) {
 
 async function loadTask(taskId, quiet = false) {
   if (!taskId) return;
-  state.taskId = taskId;
-  localStorage.setItem(selectedTaskKey, taskId);
+  state.taskId = String(taskId);
+  localStorage.setItem(selectedTaskKey, state.taskId);
   state.showCreate = false;
   if (!quiet) state.loading = true;
   try {
@@ -304,7 +304,7 @@ onBeforeUnmount(stopPolling);
         </div>
         <div class="recent-list">
           <div v-if="!state.tasks.length && !state.listLoading" class="rail-empty"><span class="empty-glyph">+</span><strong>暂无任务</strong><small>创建第一项境外所得执行任务</small></div>
-          <button v-for="task in state.tasks" :key="task.id" class="recent-item" :class="{ active: task.id === state.taskId && !state.showCreate }" @click="loadTask(task.id)">
+          <button v-for="task in state.tasks" :key="task.id" class="recent-item" :class="{ active: String(task.id) === state.taskId && !state.showCreate }" @click="loadTask(task.id)">
             <span class="recent-status" :class="({ PROCESSING: 'running', COMPLETED: 'success', FAILED: 'fail' })[task.status] || 'pending'"></span>
             <span class="recent-copy"><strong>{{ task.incomeTypeLabel }}</strong><small>{{ task.uploadedMaterialCount }}/{{ task.expectedMaterialCount }} 项 · {{ formatDate(task.createdAt) }}</small></span>
             <span class="recent-arrow">›</span>

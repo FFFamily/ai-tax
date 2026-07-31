@@ -51,7 +51,7 @@ public class ExcelParser extends BaseParser{
             List<ExcelParseResult> results = ExcelUtil.readExcel(file, excelFileRule);
             // Excel 无需 OCR，直接把行列数据标准化后参与模板路由与后处理。
             ParsePreparationResult preparation = parsePreparationService.prepareExcel(results);
-            String documentId = resolveDocumentId(info, preparation, "excel", documentRouter);
+            Long documentId = resolveDocumentId(info, preparation, "excel", documentRouter);
             logger.info("对应的文档Id：{}", documentId);
             Map<String, Object> document = documentServer.getDocument(documentId);
             if (document == null) {

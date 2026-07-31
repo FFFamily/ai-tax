@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class ExecutionTaskSummaryResponse {
     /** 用户执行任务 ID。 */
-    private String id;
+    private Long id;
 
     /** 所得类型编码，例如 SALARY。 */
     private String incomeType;
@@ -23,7 +23,7 @@ public class ExecutionTaskSummaryResponse {
     private String statusLabel;
 
     /** 关联的内部解析任务 ID，尚未提交时为空。 */
-    private String parseTaskId;
+    private Long parseTaskId;
 
     /** 该所得类型的预期材料种类数。 */
     private int expectedMaterialCount;

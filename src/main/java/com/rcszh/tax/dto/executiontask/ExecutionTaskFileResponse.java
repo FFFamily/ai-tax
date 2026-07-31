@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class ExecutionTaskFileResponse {
     /** 文件记录 ID。 */
-    private String id;
+    private Long id;
 
     /** 用户上传时的原始文件名。 */
     private String name;
@@ -23,7 +23,7 @@ public class ExecutionTaskFileResponse {
     private Long size;
 
     /** 关联的内部解析任务项 ID，尚未提交时为空。 */
-    private String parseTaskItemId;
+    private Long parseTaskItemId;
 
     /** 文件下载地址。 */
     private String downloadUrl;

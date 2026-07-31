@@ -56,7 +56,7 @@ public class DocumentTaskAsyncRunner {
      * @param executionTaskId 用户执行任务 ID
      */
     @Async("taxTaskExecutor")
-    public void start(String parseTaskId, String executionTaskId) {
+    public void start(Long parseTaskId, Long executionTaskId) {
         try {
             prepareRemoteTasks(parseTaskId);
             new TaskRunnable(parseTaskId, documentTaskServer, documentServer, pdfParser, excelParser,
@@ -73,7 +73,7 @@ public class DocumentTaskAsyncRunner {
      * 为非 Excel 文件创建远程解析任务，已有远程任务 ID 的文件不会重复提交。
      */
     @SuppressWarnings("unchecked")
-    private void prepareRemoteTasks(String parseTaskId) {
+    private void prepareRemoteTasks(Long parseTaskId) {
         Map<String, Object> task = documentTaskServer.getTaskAndItemById(parseTaskId);
         if (task == null) {
             throw new IllegalStateException("内部解析任务不存在: " + parseTaskId);
@@ -94,7 +94,7 @@ public class DocumentTaskAsyncRunner {
     /**
      * 将内部解析任务状态更新为失败。
      */
-    private void markParseTaskFailed(String parseTaskId) {
+    private void markParseTaskFailed(Long parseTaskId) {
         Map<String, Object> task = documentTaskServer.getTaskById(parseTaskId);
         if (task != null) {
             task.put(DocumentTaskServer.STATUS, RunTaskStatusEnum.FAIL.getStatus());

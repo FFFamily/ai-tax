@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class ExecutionTaskResultResponse {
     /** 内部解析任务 ID。 */
-    private String id;
+    private Long id;
 
     /** 内部解析任务状态。 */
     private String status;

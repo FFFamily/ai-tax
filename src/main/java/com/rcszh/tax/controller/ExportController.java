@@ -72,7 +72,7 @@ public class ExportController {
 
     @GetMapping("/records/{taskId}")
     @SuppressWarnings("unchecked")
-    public ApiResponse<Map<String, Object>> exportRecords(@PathVariable String taskId) {
+    public ApiResponse<Map<String, Object>> exportRecords(@PathVariable Long taskId) {
         Map<String, Object> task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             return ApiResponse.error("任务不存在");
@@ -227,7 +227,7 @@ public class ExportController {
 
     @GetMapping("/records/import/{taskId}")
     @SuppressWarnings("unchecked")
-    public ApiResponse<Void> importRecords(@PathVariable String taskId,
+    public ApiResponse<Void> importRecords(@PathVariable Long taskId,
                                            @RequestParam("fileUrl") String fileUrl,
                                            HttpServletRequest request) throws IOException {
         if (StrUtil.isBlank(fileUrl)) {

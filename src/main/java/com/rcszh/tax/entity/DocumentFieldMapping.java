@@ -10,9 +10,9 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_document_field_mapping")
 public class DocumentFieldMapping {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String documentId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long documentId;
     private String fieldLabel;
     private String fieldCode;
     private String fieldDesc;

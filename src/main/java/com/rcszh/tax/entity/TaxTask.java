@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_task")
 public class TaxTask {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

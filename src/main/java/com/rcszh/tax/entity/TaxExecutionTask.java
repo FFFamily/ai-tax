@@ -10,11 +10,11 @@ import java.time.LocalDateTime;
 @Data
 @TableName("tax_execution_task")
 public class TaxExecutionTask {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
     private String incomeType;
     private String status;
-    private String parseTaskId;
+    private Long parseTaskId;
     private LocalDateTime submittedAt;
     private String errorMessage;
     private LocalDateTime createdAt;

@@ -107,7 +107,7 @@ public class ValidationService {
                                DocumentRouteResult routeResult,
                                ValidationSampleReport report) {
         if (sampleCase.getExpectedDocumentId() != null) {
-            String actual = routeResult == null ? null : routeResult.getDocumentId();
+            Long actual = routeResult == null ? null : routeResult.getDocumentId();
             if (!sampleCase.getExpectedDocumentId().equals(actual)) {
                 report.getIssues().add("路由结果不符合预期: expected=" + sampleCase.getExpectedDocumentId() + ", actual=" + actual);
             }
