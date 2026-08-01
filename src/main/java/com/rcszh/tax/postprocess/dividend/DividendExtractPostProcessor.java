@@ -3,9 +3,10 @@ package com.rcszh.tax.postprocess.dividend;
 import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.server.DocumentTaskServer;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -13,11 +14,8 @@ import java.util.Map;
 
 @Component
 public class DividendExtractPostProcessor implements RecordPostProcessor {
-    private final DividendExtractService dividendExtractService;
-
-    public DividendExtractPostProcessor(DividendExtractService dividendExtractService) {
-        this.dividendExtractService = dividendExtractService;
-    }
+    @Resource
+    private DividendExtractService dividendExtractService;
 
     @Override
     public int order() {
@@ -31,19 +29,19 @@ public class DividendExtractPostProcessor implements RecordPostProcessor {
 
     @Override
     @SuppressWarnings("unchecked")
-    public boolean supports(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         Object candidates = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
         if (!(candidates instanceof List<?> list) || list.isEmpty()) {
             return false;
         }
         String documentType = document == null ? null : (String) document.get(DocumentServer.TYPE);
-        String requestedDocumentType = taskItem == null ? null : (String) taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE);
+        String requestedDocumentType = taskItem == null ? null : taskItem.getRequestedDocumentType();
         return containsDividendHint(documentType) || containsDividendHint(requestedDocumentType);
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         Object candidateObject = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
         if (!(candidateObject instanceof List<?> candidateMaps) || candidateMaps.isEmpty()) {
             return;

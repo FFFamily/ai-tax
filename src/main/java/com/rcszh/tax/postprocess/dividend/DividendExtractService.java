@@ -1,6 +1,7 @@
 package com.rcszh.tax.postprocess.dividend;
 
 import cn.hutool.core.util.StrUtil;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -13,11 +14,8 @@ import java.util.Objects;
 
 @Component
 public class DividendExtractService {
-    private final DividendAiEnhanceService dividendAiEnhanceService;
-
-    public DividendExtractService(DividendAiEnhanceService dividendAiEnhanceService) {
-        this.dividendAiEnhanceService = dividendAiEnhanceService;
-    }
+    @Resource
+    private DividendAiEnhanceService dividendAiEnhanceService;
 
     public List<DividendExtractRecord> extract(List<DividendCandidateRecord> candidates) {
         if (candidates == null || candidates.isEmpty()) {

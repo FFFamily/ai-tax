@@ -1,6 +1,7 @@
 package com.rcszh.tax.service;
 
 import com.rcszh.tax.config.AppProperties;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,11 +15,8 @@ import java.nio.file.StandardCopyOption;
 
 @Service
 public class StorageService {
-    private final AppProperties properties;
-
-    public StorageService(AppProperties properties) {
-        this.properties = properties;
-    }
+    @Resource
+    private AppProperties properties;
 
     public Path getBaseDir() {
         return Paths.get(properties.getStorage().getBaseDir()).toAbsolutePath().normalize();

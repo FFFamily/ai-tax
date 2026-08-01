@@ -7,7 +7,7 @@ import com.rcszh.tax.dto.BaseParseResult;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.server.AIDocumentParseServer;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.service.ChatLogService;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -23,12 +23,8 @@ import java.util.Map;
 public class DeepSeekAi extends AiManage {
     private static final Logger log = LoggerFactory.getLogger(DeepSeekAi.class);
 
-    private final AppProperties appProperties;
-
-    public DeepSeekAi(ChatLogService chatLogService, AppProperties appProperties) {
-        super(chatLogService);
-        this.appProperties = appProperties;
-    }
+    @Resource
+    private AppProperties appProperties;
 
     @Override
     public AIParseResult chat(List<? extends BaseParseResult> array, String prompt, String agentCall, Map<String, Object> documentConfig) {

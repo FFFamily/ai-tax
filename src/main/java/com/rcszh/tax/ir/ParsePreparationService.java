@@ -5,6 +5,7 @@ import com.rcszh.tax.dto.ExcelParseResult;
 import com.rcszh.tax.dto.HtmlTable;
 import com.rcszh.tax.dto.MinerUFileParseResult;
 import com.rcszh.tax.server.DocumentServer;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -33,11 +34,8 @@ public class ParsePreparationService {
     private static final String[] CURRENCY_HEADERS = {"currency", "ccy", "币种", "currencycode"};
     private static final Pattern SPLIT_PATTERN = Pattern.compile("[\\s,;:/()\\[\\]{}|]+");
 
-    private final DocumentServer documentServer;
-
-    public ParsePreparationService(DocumentServer documentServer) {
-        this.documentServer = documentServer;
-    }
+    @Resource
+    private DocumentServer documentServer;
 
     public ParsePreparationResult preparePdf(List<MinerUFileParseResult> parseResults) {
         ParsePreparationResult result = new ParsePreparationResult();

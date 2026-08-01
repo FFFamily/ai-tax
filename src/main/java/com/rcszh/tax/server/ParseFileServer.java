@@ -9,6 +9,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.config.AppProperties;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -21,13 +22,10 @@ import java.util.Optional;
 
 @Component
 public class ParseFileServer {
-    private final ApiTokenServer apiTokenServer;
-    private final AppProperties appProperties;
-
-    public ParseFileServer(ApiTokenServer apiTokenServer, AppProperties appProperties) {
-        this.apiTokenServer = apiTokenServer;
-        this.appProperties = appProperties;
-    }
+    @Resource
+    private ApiTokenServer apiTokenServer;
+    @Resource
+    private AppProperties appProperties;
 
     public String sendParseRequest(String fileUrl) {
         String token = apiTokenServer.getMinerUToken();

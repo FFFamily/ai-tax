@@ -10,6 +10,7 @@ import com.rcszh.tax.service.ExecutionTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -45,11 +46,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/execution-tasks")
 public class ExecutionTaskController {
-    private final ExecutionTaskService executionTaskService;
-
-    public ExecutionTaskController(ExecutionTaskService executionTaskService) {
-        this.executionTaskService = executionTaskService;
-    }
+    @Resource
+    private ExecutionTaskService executionTaskService;
 
     /**
      * 查询可选所得类型、对应材料清单以及文件上传限制。
@@ -159,10 +157,10 @@ public class ExecutionTaskController {
     @Operation(summary = "下载任务材料文件")
     @GetMapping("/{taskId}/files/{fileId}")
     public ResponseEntity<InputStreamResource> download(
-            @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId,
-            @Parameter(description = "待下载的材料文件记录 ID", required = true)
-            @PathVariable("fileId") @Positive(message = "文件 ID 必须为正数") Long fileId) throws IOException {
+            @PathVariable @Parameter(description = "用户执行任务 ID", required = true)
+            @Positive(message = "任务 ID 必须为正数") Long taskId,
+            @PathVariable @Parameter(description = "待下载的材料文件记录 ID", required = true)
+            @Positive(message = "文件 ID 必须为正数") Long fileId) throws IOException {
         ExecutionTaskService.FileDownload file = executionTaskService.download(taskId, fileId);
         MediaType mediaType;
         try {
@@ -188,8 +186,8 @@ public class ExecutionTaskController {
     @Operation(summary = "提交用户执行任务", description = "锁定材料并创建内部解析任务，重复提交不会重复创建")
     @PostMapping("/{taskId}/submit")
     public ApiResponse<ExecutionTaskDetailResponse> submit(
-            @Parameter(description = "待提交的用户执行任务 ID", required = true)
-            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId) {
+            @PathVariable @Parameter(description = "待提交的用户执行任务 ID", required = true)
+            @Positive(message = "任务 ID 必须为正数") Long taskId) {
         return ApiResponse.success(executionTaskService.submit(taskId));
     }
 
@@ -202,8 +200,8 @@ public class ExecutionTaskController {
     @Operation(summary = "查询用户执行任务结果", description = "通过用户执行任务访问关联的内部解析结果")
     @GetMapping("/{taskId}/result")
     public ApiResponse<ExecutionTaskResultResponse> result(
-            @Parameter(description = "用户执行任务 ID", required = true)
-            @PathVariable("taskId") @Positive(message = "任务 ID 必须为正数") Long taskId) {
+            @PathVariable @Parameter(description = "用户执行任务 ID", required = true)
+            @Positive(message = "任务 ID 必须为正数") Long taskId) {
         return ApiResponse.success(executionTaskService.result(taskId));
     }
 }

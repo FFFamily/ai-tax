@@ -1,7 +1,7 @@
 package com.rcszh.tax.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.rcszh.tax.entity.TaxTask;
+import com.rcszh.tax.entity.task.TaxTask;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

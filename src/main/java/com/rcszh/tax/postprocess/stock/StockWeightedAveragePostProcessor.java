@@ -3,6 +3,7 @@ package com.rcszh.tax.postprocess.stock;
 import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.postprocess.RecordValueUtil;
 import com.rcszh.tax.postprocess.stock.model.StockCapitalTransferRecord;
@@ -55,7 +56,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      * 快速判断 records 是否包含“股票交易类”信息，以决定是否执行加权平均单价二次加工。
      */
     @Override
-    public boolean supports(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         // 快速嗅探
         String documentType = (String) document.get(DocumentServer.TYPE);
         return documentType.contains("股票");
@@ -70,7 +71,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      * 输出：仅保留“需要申报/纳税的记录”（卖出/股息），其他非股票类型 records 原样保留，方便后续扩展更多 processor。
      */
     @Override
-    public void process(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         // 将股票相关流水从 records 中抽出来加工；其他类型记录原样保留，方便后续扩展更多 processor
         List<Map<String, Object>> stockRaw = new ArrayList<>();
         List<Map<String, Object>> others = new ArrayList<>();

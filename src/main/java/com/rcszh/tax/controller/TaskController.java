@@ -3,9 +3,12 @@ package com.rcszh.tax.controller;
 import com.rcszh.tax.common.ApiResponse;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
 import com.rcszh.tax.dto.TaskItemReviewRequest;
+import com.rcszh.tax.entity.task.DocumentTask;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.service.TaskExecutionService;
 import com.rcszh.tax.service.TaskReviewService;
+import jakarta.annotation.Resource;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,17 +24,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/tasks")
 public class TaskController {
-    private final TaskExecutionService taskExecutionService;
-    private final DocumentTaskServer documentTaskServer;
-    private final TaskReviewService taskReviewService;
-
-    public TaskController(TaskExecutionService taskExecutionService,
-                          DocumentTaskServer documentTaskServer,
-                          TaskReviewService taskReviewService) {
-        this.taskExecutionService = taskExecutionService;
-        this.documentTaskServer = documentTaskServer;
-        this.taskReviewService = taskReviewService;
-    }
+    @Resource
+    private TaskExecutionService taskExecutionService;
+    @Resource
+    private DocumentTaskServer documentTaskServer;
+    @Resource
+    private TaskReviewService taskReviewService;
 
     @PostMapping
     public ApiResponse<Map<String, Long>> createTask(@RequestBody CreateDocumentTaskDto request) {
@@ -40,8 +38,8 @@ public class TaskController {
     }
 
     @GetMapping("/{taskId}")
-    public ApiResponse<Map<String, Object>> getTask(@PathVariable Long taskId) {
-        Map<String, Object> task = documentTaskServer.getTaskAndItemById(taskId);
+    public ApiResponse<DocumentTask> getTask(@PathVariable Long taskId) {
+        DocumentTask task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             return ApiResponse.error("任务不存在");
         }
@@ -49,9 +47,9 @@ public class TaskController {
     }
 
     @PutMapping("/items/{itemId}/review")
-    public ApiResponse<Map<String, Object>> reviewTaskItem(@PathVariable Long itemId,
-                                                           @RequestBody TaskItemReviewRequest request) {
-        Map<String, Object> item = taskReviewService.reviewTaskItem(itemId, request);
+    public ApiResponse<DocumentTaskItem> reviewTaskItem(@PathVariable Long itemId,
+                                                        @RequestBody TaskItemReviewRequest request) {
+        DocumentTaskItem item = taskReviewService.reviewTaskItem(itemId, request);
         if (item == null) {
             return ApiResponse.error("任务项不存在");
         }

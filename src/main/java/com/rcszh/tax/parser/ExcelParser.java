@@ -5,11 +5,11 @@ import com.rcszh.tax.ai.DeepSeekAi;
 import com.rcszh.tax.dto.ExcelParseResult;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.ExcelFileRule;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.ir.ParsePreparationService;
 import com.rcszh.tax.route.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.util.ExcelUtil;
 import com.rcszh.tax.util.FileUtil;
 import jakarta.annotation.Resource;
@@ -33,10 +33,16 @@ public class ExcelParser extends BaseParser{
     private ParsePreparationService parsePreparationService;
     @Resource
     private DocumentRouter documentRouter;
+
     @Override
-    public AIParseResult  doParse(Map<String, Object> info) {
-        String fileRule = (String) info.get(DocumentTaskServer.Item.FILE_RULE);
-        String fileUrl = (String) info.get(DocumentTaskServer.Item.FILE_URL);
+    public boolean supports(DocumentTaskItem item) {
+        return ExcelUtil.checkFileSuffix(item.getFileUrl());
+    }
+
+    @Override
+    public AIParseResult doParse(DocumentTaskItem info) {
+        String fileRule = info.getFileRule();
+        String fileUrl = info.getFileUrl();
         ExcelFileRule excelFileRule;
         if (fileRule == null || fileRule.isBlank()){
             // 未配置时默认读取第一个 sheet，保证普通银行流水也能直接跑通。
@@ -58,8 +64,8 @@ public class ExcelParser extends BaseParser{
                 logger.error("文件获取失败：{}", documentId);
                 return null;
             }
-            info.put(DocumentTaskServer.Item.PREPARED_TRANSACTION_LINES, preparation.getTransactionLines());
-            info.put(DocumentTaskServer.Item.PREPARED_DOCUMENT_FEATURES, preparation.getDocumentFeatures());
+            info.setPreparedTransactionLines(preparation.getTransactionLines());
+            info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
             String prompt = document.get(DocumentServer.PROMPT).toString();
             List<Map<String, Object>> mapping = documentServer.getMapping(documentId);
             prompt = replacePrompt(prompt,mapping);

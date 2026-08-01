@@ -3,6 +3,8 @@ package com.rcszh.tax.validation;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
 import com.rcszh.tax.postprocess.dividend.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.DividendCandidateService;
@@ -12,7 +14,7 @@ import com.rcszh.tax.route.DocumentRouteContext;
 import com.rcszh.tax.route.DocumentRouteResult;
 import com.rcszh.tax.route.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.server.DocumentTaskServer;
+import jakarta.annotation.Resource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -25,23 +27,16 @@ import java.util.Map;
 
 @Service
 public class ValidationService {
-    private final DocumentRouter documentRouter;
-    private final DocumentServer documentServer;
-    private final DividendCandidateService dividendCandidateService;
-    private final DividendExtractService dividendExtractService;
-    private final RecordPostProcessService recordPostProcessService;
-
-    public ValidationService(DocumentRouter documentRouter,
-                             DocumentServer documentServer,
-                             DividendCandidateService dividendCandidateService,
-                             DividendExtractService dividendExtractService,
-                             RecordPostProcessService recordPostProcessService) {
-        this.documentRouter = documentRouter;
-        this.documentServer = documentServer;
-        this.dividendCandidateService = dividendCandidateService;
-        this.dividendExtractService = dividendExtractService;
-        this.recordPostProcessService = recordPostProcessService;
-    }
+    @Resource
+    private DocumentRouter documentRouter;
+    @Resource
+    private DocumentServer documentServer;
+    @Resource
+    private DividendCandidateService dividendCandidateService;
+    @Resource
+    private DividendExtractService dividendExtractService;
+    @Resource
+    private RecordPostProcessService recordPostProcessService;
 
     public List<ValidationSampleReport> runSamples() {
         List<ValidationSampleReport> reports = new ArrayList<>();
@@ -84,14 +79,14 @@ public class ValidationService {
                 extracted.stream().map(DividendExtractRecord::toMap).toList());
         parseResult.setRecords(extracted.stream().map(DividendExtractRecord::toMap).toList());
 
-        Map<String, Object> taskItem = new LinkedHashMap<>();
-        taskItem.put(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE, sampleCase.getRequestedDocumentType());
-        taskItem.put(DocumentTaskServer.Item.ROUTE_SUMMARY, routeSummary);
+        DocumentTaskItem taskItem = new DocumentTaskItem();
+        taskItem.setRequestedDocumentType(sampleCase.getRequestedDocumentType());
         if (routeResult != null) {
-            taskItem.put(DocumentTaskServer.Item.ROUTE_CONFIDENCE, routeResult.getConfidence());
-            taskItem.put(DocumentTaskServer.Item.ROUTE_REASON, String.join("；", routeResult.getReasons()));
-            taskItem.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, routeResult.isNeedHumanReview());
-            taskItem.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, routeResult.getDocumentId());
+            taskItem.setRouteConfidence(routeResult.getConfidence());
+            taskItem.setRouteReason(String.join("；", routeResult.getReasons()));
+            taskItem.setNeedHumanReview(routeResult.isNeedHumanReview());
+            taskItem.setResolvedDocumentId(routeResult.getDocumentId());
+            taskItem.setRouteSummary(toRouteSummary(routeResult));
         }
         Map<String, Object> document = routeResult == null ? null : documentServer.getDocument(routeResult.getDocumentId());
         recordPostProcessService.postProcess(parseResult, taskItem, document);
@@ -101,6 +96,18 @@ public class ValidationService {
         report.setNeedHumanReview(Boolean.TRUE.equals(parseResult.getGlobalParam().get("needHumanReview")));
         collectIssues(sampleCase, routeResult, report);
         return report;
+    }
+
+    private ExecutionTaskRouteSummaryResponse toRouteSummary(DocumentRouteResult routeResult) {
+        ExecutionTaskRouteSummaryResponse summary = new ExecutionTaskRouteSummaryResponse();
+        summary.setDocumentId(routeResult.getDocumentId());
+        summary.setDocumentType(routeResult.getDocumentType());
+        summary.setVariant(routeResult.getVariant());
+        summary.setConfidence(routeResult.getConfidence());
+        summary.setNeedHumanReview(routeResult.isNeedHumanReview());
+        summary.setRouteSource(routeResult.getRouteSource());
+        summary.setReasons(routeResult.getReasons());
+        return summary;
     }
 
     private void collectIssues(ValidationSampleCase sampleCase,

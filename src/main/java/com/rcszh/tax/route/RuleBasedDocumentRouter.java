@@ -5,6 +5,7 @@ import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.ir.DocumentFeatures;
 import com.rcszh.tax.server.DocumentServer;
 import com.rcszh.tax.service.ReviewLearningService;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -22,17 +23,12 @@ import java.util.Set;
 public class RuleBasedDocumentRouter implements DocumentRouter {
     private static final BigDecimal AUTO_PASS_THRESHOLD = new BigDecimal("0.60");
 
-    private final DocumentServer documentServer;
-    private final RouteAiFallbackService routeAiFallbackService;
-    private final ReviewLearningService reviewLearningService;
-
-    public RuleBasedDocumentRouter(DocumentServer documentServer,
-                                   RouteAiFallbackService routeAiFallbackService,
-                                   ReviewLearningService reviewLearningService) {
-        this.documentServer = documentServer;
-        this.routeAiFallbackService = routeAiFallbackService;
-        this.reviewLearningService = reviewLearningService;
-    }
+    @Resource
+    private DocumentServer documentServer;
+    @Resource
+    private RouteAiFallbackService routeAiFallbackService;
+    @Resource
+    private ReviewLearningService reviewLearningService;
 
     @Override
     public DocumentRouteResult route(DocumentRouteContext context) {

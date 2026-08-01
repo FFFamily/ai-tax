@@ -1,5 +1,6 @@
 package com.rcszh.tax.service;
 
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -9,11 +10,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  */
 @Component
 public class DocumentParseTaskEventListener {
-    private final DocumentTaskAsyncRunner asyncRunner;
-
-    public DocumentParseTaskEventListener(DocumentTaskAsyncRunner asyncRunner) {
-        this.asyncRunner = asyncRunner;
-    }
+    @Resource
+    private DocumentTaskAsyncRunner asyncRunner;
 
     /**
      * 在创建解析任务的事务提交后触发异步执行，避免异步线程读取到未提交数据。

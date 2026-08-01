@@ -12,8 +12,8 @@ import com.rcszh.tax.dto.executiontask.ExecutionTaskOptionsResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskPageResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskSummaryResponse;
-import com.rcszh.tax.entity.TaxExecutionTask;
-import com.rcszh.tax.entity.TaxExecutionTaskFile;
+import com.rcszh.tax.entity.task.TaxExecutionTask;
+import com.rcszh.tax.entity.task.TaxExecutionTaskFile;
 import com.rcszh.tax.enums.ExecutionTaskStatusEnum;
 import com.rcszh.tax.enums.IncomeMaterialTypeEnum;
 import com.rcszh.tax.enums.OverseasIncomeTypeEnum;
@@ -21,6 +21,7 @@ import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.util.ExcelUtil;
+import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -63,23 +64,16 @@ public class ExecutionTaskService {
             Map.entry("jpeg", Set.of("image/jpeg"))
     );
 
-    private final TaxExecutionTaskMapper taskMapper;
-    private final TaxExecutionTaskFileMapper fileMapper;
-    private final StorageService storageService;
-    private final DocumentTaskServer documentTaskServer;
-    private final ApplicationEventPublisher eventPublisher;
-
-    public ExecutionTaskService(TaxExecutionTaskMapper taskMapper,
-                                TaxExecutionTaskFileMapper fileMapper,
-                                StorageService storageService,
-                                DocumentTaskServer documentTaskServer,
-                                ApplicationEventPublisher eventPublisher) {
-        this.taskMapper = taskMapper;
-        this.fileMapper = fileMapper;
-        this.storageService = storageService;
-        this.documentTaskServer = documentTaskServer;
-        this.eventPublisher = eventPublisher;
-    }
+    @Resource
+    private TaxExecutionTaskMapper taskMapper;
+    @Resource
+    private TaxExecutionTaskFileMapper fileMapper;
+    @Resource
+    private StorageService storageService;
+    @Resource
+    private DocumentTaskServer documentTaskServer;
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * 生成前端创建任务所需的所得类型、材料映射和文件上传限制。

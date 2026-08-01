@@ -4,7 +4,9 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.dto.TaskItemReviewRequest;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.server.DocumentTaskServer;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,18 +17,14 @@ import java.util.Map;
 
 @Service
 public class TaskReviewService {
-    private final DocumentTaskServer documentTaskServer;
-    private final ReviewLearningService reviewLearningService;
-
-    public TaskReviewService(DocumentTaskServer documentTaskServer,
-                             ReviewLearningService reviewLearningService) {
-        this.documentTaskServer = documentTaskServer;
-        this.reviewLearningService = reviewLearningService;
-    }
+    @Resource
+    private DocumentTaskServer documentTaskServer;
+    @Resource
+    private ReviewLearningService reviewLearningService;
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> reviewTaskItem(Long itemId, TaskItemReviewRequest request) {
-        Map<String, Object> item = documentTaskServer.getTaskItemById(itemId);
+    public DocumentTaskItem reviewTaskItem(Long itemId, TaskItemReviewRequest request) {
+        DocumentTaskItem item = documentTaskServer.getTaskItemById(itemId);
         if (item == null) {
             return null;
         }
@@ -43,14 +41,15 @@ public class TaskReviewService {
             reviewReasons.add("reviewer:" + request.getReviewer().trim());
         }
 
-        item.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, needHumanReview);
-        item.put(DocumentTaskServer.Item.REVIEW_REASONS, reviewReasons.stream().distinct().toList());
+        List<String> distinctReviewReasons = reviewReasons.stream().distinct().toList();
+        item.setNeedHumanReview(needHumanReview);
+        item.setReviewReasons(JSONUtil.toJsonStr(distinctReviewReasons));
         if (request.getResolvedDocumentId() != null) {
-            item.put(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID, request.getResolvedDocumentId());
+            item.setResolvedDocumentId(request.getResolvedDocumentId());
         }
 
-        Object changeResult = item.get(DocumentTaskServer.Item.CHANGE_RESULT);
-        JSONObject root = changeResult == null || changeResult.toString().isBlank()
+        String changeResult = item.getChangeResult();
+        JSONObject root = changeResult == null || changeResult.isBlank()
                 ? new JSONObject()
                 : JSONUtil.parseObj(changeResult);
         JSONObject globalParam = root.getJSONObject("globalParam");
@@ -71,8 +70,8 @@ public class TaskReviewService {
             globalParam.set("dividendExtractCount", reviewedRecords.size());
         }
         globalParam.set("needHumanReview", needHumanReview);
-        globalParam.set("reviewReasons", reviewReasons.stream().distinct().toList());
-        globalParam.set("dividendReviewReasons", reviewReasons.stream().distinct().toList());
+        globalParam.set("reviewReasons", distinctReviewReasons);
+        globalParam.set("dividendReviewReasons", distinctReviewReasons);
         if (request.getReviewer() != null && !request.getReviewer().isBlank()) {
             globalParam.set("reviewer", request.getReviewer().trim());
         }
@@ -83,9 +82,9 @@ public class TaskReviewService {
             globalParam.set("resolvedDocumentId", request.getResolvedDocumentId());
         }
 
-        item.put(DocumentTaskServer.Item.CHANGE_RESULT, root.toString());
+        item.setChangeResult(root.toString());
         documentTaskServer.updateTaskItem(item);
-        Map<String, Object> updated = documentTaskServer.getTaskItemById(itemId);
+        DocumentTaskItem updated = documentTaskServer.getTaskItemById(itemId);
         // 复核完成后立即沉淀学习样本，为后续模板路由和 AI few-shot 提供反馈数据。
         reviewLearningService.saveLearningFromReview(updated, reviewedRecords, request.getReviewer(), request.getComment());
         return updated;

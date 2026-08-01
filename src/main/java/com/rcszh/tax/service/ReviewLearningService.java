@@ -5,8 +5,9 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.entity.ReviewLearning;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.mapper.ReviewLearningMapper;
-import com.rcszh.tax.server.DocumentTaskServer;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,31 +21,25 @@ import java.util.Set;
 
 @Service
 public class ReviewLearningService {
-    private final ReviewLearningMapper reviewLearningMapper;
-
-    public ReviewLearningService(ReviewLearningMapper reviewLearningMapper) {
-        this.reviewLearningMapper = reviewLearningMapper;
-    }
+    @Resource
+    private ReviewLearningMapper reviewLearningMapper;
 
     @Transactional(rollbackFor = Exception.class)
-    public void saveLearningFromReview(Map<String, Object> taskItem,
+    public void saveLearningFromReview(DocumentTaskItem taskItem,
                                        List<Map<String, Object>> reviewedRecords,
                                        String reviewer,
                                        String comment) {
-        if (taskItem == null || taskItem.get(DocumentTaskServer.Item.FIELD_ID) == null) {
+        if (taskItem == null || taskItem.getId() == null) {
             return;
         }
         // 每次人工复核都落成一条 learning 记录，把“纠错结果”转成后续可复用的机器线索。
         ReviewLearning learning = new ReviewLearning();
-        learning.setTaskItemId(toLong(taskItem.get(DocumentTaskServer.Item.FIELD_ID)));
-        Object taskId = taskItem.get("task_id");
-        if (taskId != null) {
-            learning.setTaskId(toLong(taskId));
-        }
-        learning.setRequestedDocumentType((String) taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE));
-        learning.setResolvedDocumentId(toLong(taskItem.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID)));
-        learning.setRouteSummary(JSONUtil.toJsonStr(taskItem.get(DocumentTaskServer.Item.ROUTE_SUMMARY)));
-        learning.setReviewReasons(JSONUtil.toJsonStr(taskItem.get(DocumentTaskServer.Item.REVIEW_REASONS)));
+        learning.setTaskItemId(taskItem.getId());
+        learning.setTaskId(taskItem.getTaskId());
+        learning.setRequestedDocumentType(taskItem.getRequestedDocumentType());
+        learning.setResolvedDocumentId(taskItem.getResolvedDocumentId());
+        learning.setRouteSummary(JSONUtil.toJsonStr(taskItem.getRouteSummary()));
+        learning.setReviewReasons(taskItem.getReviewReasons());
         learning.setReviewedRecords(JSONUtil.toJsonStr(reviewedRecords));
         learning.setReviewer(reviewer);
         learning.setComment(comment);
@@ -138,12 +133,12 @@ public class ReviewLearningService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> buildSuggestedMatchRule(Map<String, Object> taskItem,
+    private Map<String, Object> buildSuggestedMatchRule(DocumentTaskItem taskItem,
                                                         List<Map<String, Object>> reviewedRecords) {
         Map<String, Object> rule = new LinkedHashMap<>();
-        rule.put("requestedDocumentType", taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE));
-        rule.put("resolvedDocumentId", taskItem.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID));
-        rule.put("routeSummary", taskItem.get(DocumentTaskServer.Item.ROUTE_SUMMARY));
+        rule.put("requestedDocumentType", taskItem.getRequestedDocumentType());
+        rule.put("resolvedDocumentId", taskItem.getResolvedDocumentId());
+        rule.put("routeSummary", taskItem.getRouteSummary());
 
         Set<String> anyKeywords = new LinkedHashSet<>();
         // 当前先抽取摘要、付款方、币种等稳定字段，后续可以继续扩展到表头和机构名。
@@ -156,12 +151,12 @@ public class ReviewLearningService {
         return rule;
     }
 
-    private Map<String, Object> buildFewShotExample(Map<String, Object> taskItem,
+    private Map<String, Object> buildFewShotExample(DocumentTaskItem taskItem,
                                                     List<Map<String, Object>> reviewedRecords) {
         Map<String, Object> example = new LinkedHashMap<>();
-        example.put("requestedDocumentType", taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE));
-        example.put("resolvedDocumentId", taskItem.get(DocumentTaskServer.Item.RESOLVED_DOCUMENT_ID));
-        example.put("routeSummary", taskItem.get(DocumentTaskServer.Item.ROUTE_SUMMARY));
+        example.put("requestedDocumentType", taskItem.getRequestedDocumentType());
+        example.put("resolvedDocumentId", taskItem.getResolvedDocumentId());
+        example.put("routeSummary", taskItem.getRouteSummary());
         example.put("reviewedRecords", reviewedRecords);
         return example;
     }
@@ -182,16 +177,6 @@ public class ReviewLearningService {
             return List.of();
         }
         return learnings.stream().limit(Math.max(limit, 1)).toList();
-    }
-
-    private Long toLong(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        return Long.valueOf(value.toString());
     }
 
     private void collectKeyword(Collection<String> target, Object value) {

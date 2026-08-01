@@ -12,11 +12,14 @@ import com.rcszh.tax.dto.DetailRecord;
 import com.rcszh.tax.dto.DetailRecordImport;
 import com.rcszh.tax.dto.ExportDataDTO;
 import com.rcszh.tax.dto.ExportRequestDTO;
+import com.rcszh.tax.entity.task.DocumentTask;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.service.StorageService;
 import com.rcszh.tax.util.BaseExportUtil;
 import com.rcszh.tax.util.FileUtil;
 import com.rcszh.tax.util.export.SheetConfig;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,13 +48,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/exports")
 public class ExportController {
-    private final DocumentTaskServer documentTaskServer;
-    private final StorageService storageService;
-
-    public ExportController(DocumentTaskServer documentTaskServer, StorageService storageService) {
-        this.documentTaskServer = documentTaskServer;
-        this.storageService = storageService;
-    }
+    @Resource
+    private DocumentTaskServer documentTaskServer;
+    @Resource
+    private StorageService storageService;
 
     private String safeToString(Object obj) {
         return obj == null ? "" : obj.toString();
@@ -73,13 +73,12 @@ public class ExportController {
     @GetMapping("/records/{taskId}")
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> exportRecords(@PathVariable Long taskId) {
-        Map<String, Object> task = documentTaskServer.getTaskAndItemById(taskId);
+        DocumentTask task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             return ApiResponse.error("任务不存在");
         }
-        List<Map<String, Object>> taskItems = (List<Map<String, Object>>) task.get(DocumentTaskServer.DOCUMENT_TASK_ITEM_TABLE_NAME);
-        for (Map<String, Object> taskItem : taskItems) {
-            String jsonData = taskItem.get(DocumentTaskServer.Item.CHANGE_RESULT) == null ? null : taskItem.get(DocumentTaskServer.Item.CHANGE_RESULT).toString();
+        for (DocumentTaskItem taskItem : task.getItems()) {
+            String jsonData = taskItem.getChangeResult();
             if (StringUtils.isEmpty(jsonData)) {
                 continue;
             }
@@ -233,15 +232,15 @@ public class ExportController {
         if (StrUtil.isBlank(fileUrl)) {
             return ApiResponse.error("文件地址不能为空");
         }
-        Map<String, Object> task = documentTaskServer.getTaskAndItemById(taskId);
+        DocumentTask task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             return ApiResponse.error("任务不存在");
         }
-        List<Map<String, Object>> taskItems = (List<Map<String, Object>>) task.get(DocumentTaskServer.DOCUMENT_TASK_ITEM_TABLE_NAME);
+        List<DocumentTaskItem> taskItems = task.getItems();
         if (taskItems.isEmpty()) {
             return ApiResponse.error("任务项不存在");
         }
-        Map<String, Object> item = taskItems.getFirst();
+        DocumentTaskItem item = taskItems.getFirst();
         try {
             String fullUrl = buildFullUrl(fileUrl, request);
             RestTemplate restTemplate = new RestTemplate();
@@ -256,9 +255,9 @@ public class ExportController {
                 return ApiResponse.error("文件无数据");
             }
             List<DetailRecord> records = convertToDetailRecords(importList);
-            JSONObject jsonObject = JSONUtil.parseObj(item.get(DocumentTaskServer.Item.CHANGE_RESULT));
+            JSONObject jsonObject = JSONUtil.parseObj(item.getChangeResult());
             jsonObject.set("records", records);
-            item.put(DocumentTaskServer.Item.CHANGE_RESULT, jsonObject.toString());
+            item.setChangeResult(jsonObject.toString());
             documentTaskServer.updateTaskItem(item);
             return ApiResponse.success();
         } catch (Exception e) {

@@ -10,6 +10,7 @@ import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.rcszh.tax.config.AppProperties;
 import com.rcszh.tax.entity.ChatLog;
 import com.rcszh.tax.service.ChatLogService;
+import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -25,13 +26,10 @@ import java.util.Map;
 
 @Component
 public class DividendAiEnhanceService {
-    private final AppProperties appProperties;
-    private final ChatLogService chatLogService;
-
-    public DividendAiEnhanceService(AppProperties appProperties, ChatLogService chatLogService) {
-        this.appProperties = appProperties;
-        this.chatLogService = chatLogService;
-    }
+    @Resource
+    private AppProperties appProperties;
+    @Resource
+    private ChatLogService chatLogService;
 
     public List<DividendExtractRecord> enhance(List<DividendCandidateRecord> candidates,
                                                List<DividendExtractRecord> currentRecords) {

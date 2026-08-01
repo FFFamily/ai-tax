@@ -11,6 +11,7 @@ import com.rcszh.tax.config.AppProperties;
 import com.rcszh.tax.entity.ChatLog;
 import com.rcszh.tax.service.ChatLogService;
 import com.rcszh.tax.service.ReviewLearningService;
+import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -26,17 +27,12 @@ import java.util.Map;
 
 @Component
 public class RouteAiFallbackService {
-    private final AppProperties appProperties;
-    private final ChatLogService chatLogService;
-    private final ReviewLearningService reviewLearningService;
-
-    public RouteAiFallbackService(AppProperties appProperties,
-                                  ChatLogService chatLogService,
-                                  ReviewLearningService reviewLearningService) {
-        this.appProperties = appProperties;
-        this.chatLogService = chatLogService;
-        this.reviewLearningService = reviewLearningService;
-    }
+    @Resource
+    private AppProperties appProperties;
+    @Resource
+    private ChatLogService chatLogService;
+    @Resource
+    private ReviewLearningService reviewLearningService;
 
     public RouteAiDecision decide(DocumentRouteContext context, List<Map<String, Object>> candidates) {
         if (candidates == null || candidates.isEmpty() || StrUtil.isBlank(appProperties.getAi().getDeepseekApiKey())) {

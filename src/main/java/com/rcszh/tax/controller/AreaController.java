@@ -6,6 +6,7 @@ import com.rcszh.tax.common.ApiResponse;
 import com.rcszh.tax.dto.WordAreaDto;
 import com.rcszh.tax.entity.WordArea;
 import com.rcszh.tax.mapper.WordAreaMapper;
+import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,11 +19,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/areas")
 public class AreaController {
-    private final WordAreaMapper wordAreaMapper;
-
-    public AreaController(WordAreaMapper wordAreaMapper) {
-        this.wordAreaMapper = wordAreaMapper;
-    }
+    @Resource
+    private WordAreaMapper wordAreaMapper;
 
     @GetMapping
     public ApiResponse<List<WordAreaDto>> getAreaList() {

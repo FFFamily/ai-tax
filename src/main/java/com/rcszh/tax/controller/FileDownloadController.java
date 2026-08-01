@@ -1,6 +1,7 @@
 package com.rcszh.tax.controller;
 
 import com.rcszh.tax.service.StorageService;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +23,8 @@ import java.nio.file.Path;
 public class FileDownloadController {
     private static final Logger logger = LoggerFactory.getLogger(FileDownloadController.class);
 
-    private final StorageService storageService;
-
-    public FileDownloadController(StorageService storageService) {
-        this.storageService = storageService;
-    }
+    @Resource
+    private StorageService storageService;
 
     @GetMapping("/download")
     public ResponseEntity<InputStreamResource> fileDownload(@RequestParam("fileName") String fileName,

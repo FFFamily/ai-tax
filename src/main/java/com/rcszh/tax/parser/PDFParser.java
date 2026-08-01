@@ -1,16 +1,17 @@
 package com.rcszh.tax.parser;
 
+import cn.hutool.core.io.FileTypeUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.ai.DeepSeekAi;
 import com.rcszh.tax.dto.HtmlTable;
 import com.rcszh.tax.dto.MinerUFileParseResult;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.ir.ParsePreparationService;
 import com.rcszh.tax.route.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.server.DocumentTaskServer;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +37,20 @@ public class PDFParser extends BaseParser{
     private ParsePreparationService parsePreparationService;
     @Resource
     private DocumentRouter documentRouter;
+
     @Override
-    public AIParseResult doParse(Map<String, Object> info) {
-        String result = (String) info.get(DocumentTaskServer.Item.FIELD_TASK_RESULT);
-        if (result.isBlank()){
+    public boolean requiresRemoteParse() {
+        return true;
+    }
+    @Override
+    public boolean supports(DocumentTaskItem item) {
+        return item.getFileUrl().contains("pdf");
+    }
+
+    @Override
+    public AIParseResult doParse(DocumentTaskItem info) {
+        String result = info.getTaskResult();
+        if (StrUtil.isBlank(result)) {
             logger.info("缺失需要解析的信息");
             return null;
         }
@@ -63,9 +74,9 @@ public class PDFParser extends BaseParser{
             preparation = parsePreparationService.preparePdf(parseResults);
         }
         List<HtmlTable> resultTables = preparation.getHtmlTables();
-        info.put(DocumentTaskServer.Item.TABLE_RESULT, JSONUtil.toJsonStr(resultTables));
-        info.put(DocumentTaskServer.Item.PREPARED_TRANSACTION_LINES, preparation.getTransactionLines());
-        info.put(DocumentTaskServer.Item.PREPARED_DOCUMENT_FEATURES, preparation.getDocumentFeatures());
+        info.setTableResult(JSONUtil.toJsonStr(resultTables));
+        info.setPreparedTransactionLines(preparation.getTransactionLines());
+        info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
         logger.info("开始执行AI解析");
         StringBuilder promptBuild = new StringBuilder();
         String globalPrompt = Optional.ofNullable(document.get(DocumentServer.GLOBAL_PROMPT)).orElse("").toString();

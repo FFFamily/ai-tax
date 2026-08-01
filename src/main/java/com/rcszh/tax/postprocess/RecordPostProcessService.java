@@ -1,6 +1,8 @@
 package com.rcszh.tax.postprocess;
 
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -17,17 +19,8 @@ import java.util.Map;
  */
 @Component
 public class RecordPostProcessService {
-    private final List<RecordPostProcessor> processors;
-
-    /**
-     * 通过 Spring 注入所有 RecordPostProcessor，并按 order 排序。
-     */
-    public RecordPostProcessService(List<RecordPostProcessor> processors) {
-        // Spring 注入的 processors 可能为空（兼容），这里做兜底
-        this.processors = processors == null ? List.of() : processors.stream()
-                .sorted(Comparator.comparingInt(RecordPostProcessor::order))
-                .toList();
-    }
+    @Resource
+    private List<RecordPostProcessor> processors;
 
     /**
      * 对 parseResult.records 进行二次加工：
@@ -35,12 +28,15 @@ public class RecordPostProcessService {
      * - 将最终结果回写到 parseResult.records
      * - 将已执行的处理器名称写入 globalParam.postProcessApplied（便于追踪）
      */
-    public void postProcess(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public void postProcess(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         if (parseResult == null) {
             return;
         }
         List<String> applied = new ArrayList<>();
-        for (RecordPostProcessor processor : processors) {
+        List<RecordPostProcessor> orderedProcessors = processors == null ? List.of() : processors.stream()
+                .sorted(Comparator.comparingInt(RecordPostProcessor::order))
+                .toList();
+        for (RecordPostProcessor processor : orderedProcessors) {
             if (!processor.supports(parseResult, taskItem,document)) {
                 continue;
             }

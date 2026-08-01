@@ -1,9 +1,10 @@
 package com.rcszh.tax.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.rcszh.tax.entity.TaxExecutionTask;
+import com.rcszh.tax.entity.task.TaxExecutionTask;
 import com.rcszh.tax.enums.ExecutionTaskStatusEnum;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,11 +12,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ExecutionTaskStateService {
-    private final TaxExecutionTaskMapper taskMapper;
-
-    public ExecutionTaskStateService(TaxExecutionTaskMapper taskMapper) {
-        this.taskMapper = taskMapper;
-    }
+    @Resource
+    private TaxExecutionTaskMapper taskMapper;
 
     /**
      * 将执行任务标记为处理完成，并清除历史错误信息。

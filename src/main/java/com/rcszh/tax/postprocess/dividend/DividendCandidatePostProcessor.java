@@ -3,10 +3,11 @@ package com.rcszh.tax.postprocess.dividend;
 import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.TransactionLine;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.server.DocumentServer;
-import com.rcszh.tax.server.DocumentTaskServer;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,11 +15,8 @@ import java.util.Map;
 
 @Component
 public class DividendCandidatePostProcessor implements RecordPostProcessor {
-    private final DividendCandidateService dividendCandidateService;
-
-    public DividendCandidatePostProcessor(DividendCandidateService dividendCandidateService) {
-        this.dividendCandidateService = dividendCandidateService;
-    }
+    @Resource
+    private DividendCandidateService dividendCandidateService;
 
     @Override
     public int order() {
@@ -31,27 +29,24 @@ public class DividendCandidatePostProcessor implements RecordPostProcessor {
     }
 
     @Override
-    public boolean supports(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         if (taskItem == null) {
             return false;
         }
-        Object preparedLines = taskItem.get(DocumentTaskServer.Item.PREPARED_TRANSACTION_LINES);
-        if (!(preparedLines instanceof List<?> list) || list.isEmpty()) {
+        if (taskItem.getPreparedTransactionLines() == null || taskItem.getPreparedTransactionLines().isEmpty()) {
             return false;
         }
         String documentType = document == null ? null : (String) document.get(DocumentServer.TYPE);
-        String requestedDocumentType = (String) taskItem.get(DocumentTaskServer.Item.REQUESTED_DOCUMENT_TYPE);
+        String requestedDocumentType = taskItem.getRequestedDocumentType();
         return containsDividendHint(documentType) || containsDividendHint(requestedDocumentType) || parseResult != null;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
-        Object preparedLines = taskItem.get(DocumentTaskServer.Item.PREPARED_TRANSACTION_LINES);
-        if (!(preparedLines instanceof List<?> list) || list.isEmpty()) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+        List<TransactionLine> transactionLines = taskItem.getPreparedTransactionLines();
+        if (transactionLines == null || transactionLines.isEmpty()) {
             return;
         }
-        List<TransactionLine> transactionLines = (List<TransactionLine>) list;
         List<DividendCandidateRecord> candidates = dividendCandidateService.collectCandidates(transactionLines);
         if (candidates.isEmpty()) {
             return;

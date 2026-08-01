@@ -1,4 +1,4 @@
-package com.rcszh.tax.entity;
+package com.rcszh.tax.entity.task;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

@@ -9,6 +9,7 @@ import com.rcszh.tax.entity.ChatLog;
 import com.rcszh.tax.enums.DocumentPageTypeEnum;
 import com.rcszh.tax.server.AIDocumentParseServer;
 import com.rcszh.tax.service.ChatLogService;
+import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 
 import java.math.BigDecimal;
@@ -23,11 +24,8 @@ import java.util.stream.Collectors;
 public abstract class AiManage {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiManage.class);
 
-    protected final ChatLogService chatLogService;
-
-    protected AiManage(ChatLogService chatLogService) {
-        this.chatLogService = chatLogService;
-    }
+    @Resource
+    protected ChatLogService chatLogService;
 
     public abstract AIParseResult chat(List<? extends BaseParseResult> array, String prompt, String agentCall, Map<String, Object> documentConfig);
 

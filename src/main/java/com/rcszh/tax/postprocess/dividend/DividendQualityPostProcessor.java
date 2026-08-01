@@ -5,8 +5,8 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
-import com.rcszh.tax.server.DocumentTaskServer;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -30,14 +30,14 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
     }
 
     @Override
-    public boolean supports(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         return records instanceof List<?> list && !list.isEmpty();
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, Map<String, Object> taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         if (!(records instanceof List<?> list) || list.isEmpty()) {
             return;
@@ -83,14 +83,13 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
             }
         }
         parseResult.getGlobalParam().put(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS, reviewed);
-        Object routeSummary = taskItem.get(DocumentTaskServer.Item.ROUTE_SUMMARY);
-        if (routeSummary instanceof Map<?, ?> routeInfo) {
-            parseResult.getGlobalParam().put("routeSummary", routeInfo);
+        if (taskItem.getRouteSummary() != null) {
+            parseResult.getGlobalParam().put("routeSummary", taskItem.getRouteSummary());
             // 模板路由本身置信度过低时，即使字段看起来完整，也要提醒人工确认模板是否选对。
-            Object routeConfidence = routeInfo.get("confidence");
-            if (routeConfidence != null && new BigDecimal(routeConfidence.toString()).compareTo(new BigDecimal("0.60")) < 0) {
+            BigDecimal routeConfidence = taskItem.getRouteSummary().getConfidence();
+            if (routeConfidence != null && routeConfidence.compareTo(new BigDecimal("0.60")) < 0) {
                 needHumanReview = true;
-                taskItem.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, true);
+                taskItem.setNeedHumanReview(true);
                 reviewReasons.add("路由置信度低于0.60");
                 parseResult.getWarnings().add("文档路由置信度较低，建议人工确认模板。");
             }
@@ -100,12 +99,12 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         parseResult.getGlobalParam().put("reviewReasons", finalReviewReasons);
         parseResult.getGlobalParam().put("needHumanReview", needHumanReview);
         if (needHumanReview) {
-            taskItem.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, true);
-            taskItem.put(DocumentTaskServer.Item.REVIEW_REASONS, JSONUtil.toJsonStr(finalReviewReasons));
+            taskItem.setNeedHumanReview(true);
+            taskItem.setReviewReasons(JSONUtil.toJsonStr(finalReviewReasons));
             parseResult.getWarnings().add("股息专项记录存在低置信或字段缺失，建议人工复核。");
         } else {
-            taskItem.put(DocumentTaskServer.Item.NEED_HUMAN_REVIEW, false);
-            taskItem.put(DocumentTaskServer.Item.REVIEW_REASONS, JSONUtil.toJsonStr(finalReviewReasons));
+            taskItem.setNeedHumanReview(false);
+            taskItem.setReviewReasons(JSONUtil.toJsonStr(finalReviewReasons));
         }
         if (parseResult.getRecords() != null && !parseResult.getRecords().isEmpty()) {
             parseResult.setRecords(reviewed);
