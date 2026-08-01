@@ -1,6 +1,8 @@
-package com.rcszh.tax.postprocess.dividend;
+package com.rcszh.tax.postprocess.dividend.service;
 
 import cn.hutool.core.util.StrUtil;
+import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
+import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -10,22 +12,36 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
+/**
+ * 将股息候选流水聚合为专项股息记录的领域服务。
+ *
+ * <p>先按日期、付款方和币种进行确定性规则聚合，再调用 AI 增强服务补齐或纠偏；
+ * AI 不可用或调用失败时仍返回规则结果。</p>
+ */
 @Component
 public class DividendExtractService {
+    /** 对规则抽取结果进行可选补齐的 AI 增强服务。 */
     @Resource
     private DividendAiEnhanceService dividendAiEnhanceService;
 
+    /**
+     * 聚合候选记录并执行可选 AI 增强。
+     *
+     * @param candidates 候选召回阶段产生的股息收入/税费记录
+     * @return 专项股息记录；候选为空时返回不可变空列表
+     */
     public List<DividendExtractRecord> extract(List<DividendCandidateRecord> candidates) {
         if (candidates == null || candidates.isEmpty()) {
             return List.of();
         }
+        // grouped 使用 LinkedHashMap 保持分组首次出现顺序，使输出稳定且便于追溯。
         Map<String, List<DividendCandidateRecord>> grouped = new LinkedHashMap<>();
         // 候选记录先按日期/付款方/币种聚合，尽量把“分红入账 + 预扣税”还原为一笔业务事件。
         for (DividendCandidateRecord candidate : candidates) {
             grouped.computeIfAbsent(groupKey(candidate), key -> new ArrayList<>()).add(candidate);
         }
+        // result 是规则聚合基线，即使 AI 增强失败也会原样返回。
         List<DividendExtractRecord> result = new ArrayList<>();
         for (List<DividendCandidateRecord> group : grouped.values()) {
             DividendExtractRecord record = toRecord(group);
@@ -37,6 +53,12 @@ public class DividendExtractService {
         return dividendAiEnhanceService.enhance(candidates, result);
     }
 
+    /**
+     * 将同一股息业务事件的候选行合并为一条专项记录。
+     *
+     * @param group 日期、付款方和币种相同的候选记录组
+     * @return 聚合后的股息记录；分组为空时返回 {@code null}
+     */
     private DividendExtractRecord toRecord(List<DividendCandidateRecord> group) {
         if (group == null || group.isEmpty()) {
             return null;
@@ -49,11 +71,17 @@ public class DividendExtractService {
         record.setSummary(base.getSummary());
         record.setCategory("DIVIDEND");
 
+        /** 组内股息收入行绝对值之和。 */
         BigDecimal netAmount = null;
+        /** 组内股息税费行绝对值之和。 */
         BigDecimal withholdingTax = null;
+        /** 组内候选置信分总和，用于计算平均置信度。 */
         BigDecimal totalConfidence = BigDecimal.ZERO;
+        /** 合并后的候选命中原因。 */
         List<String> reasons = new ArrayList<>();
+        /** 以流水行号为键保存原始证据，便于审计追溯。 */
         Map<String, Object> evidence = new LinkedHashMap<>();
+        /** 参与当前聚合结果的流水行号。 */
         List<String> evidenceRowIds = new ArrayList<>();
 
         // 组内收入行汇总为净额，税费行汇总为预扣税，再反推出毛额。
@@ -86,6 +114,12 @@ public class DividendExtractService {
         return record;
     }
 
+    /**
+     * 从同组候选中推断付款方，均缺失时退化为首条摘要。
+     *
+     * @param group 候选记录组
+     * @return 可用付款方或首条记录摘要
+     */
     private String inferPayer(List<DividendCandidateRecord> group) {
         return group.stream()
                 .map(DividendCandidateRecord::getPayer)
@@ -94,6 +128,12 @@ public class DividendExtractService {
                 .orElse(group.getFirst().getSummary());
     }
 
+    /**
+     * 构造股息业务聚合键。
+     *
+     * @param candidate 股息候选记录
+     * @return 由日期、付款方和币种拼接的分组键
+     */
     private String groupKey(DividendCandidateRecord candidate) {
         return String.join("|",
                 StrUtil.blankToDefault(candidate.getDividendDate(), ""),
@@ -101,6 +141,13 @@ public class DividendExtractService {
                 StrUtil.blankToDefault(candidate.getCurrency(), ""));
     }
 
+    /**
+     * 根据净额和预扣税计算股息毛额。
+     *
+     * @param netAmount 股息净额
+     * @param withholdingTax 预扣税额
+     * @return 两者之和；两者均为空时返回 {@code null}
+     */
     private BigDecimal calculateGross(BigDecimal netAmount, BigDecimal withholdingTax) {
         if (netAmount == null && withholdingTax == null) {
             return null;
@@ -108,6 +155,13 @@ public class DividendExtractService {
         return add(netAmount, withholdingTax);
     }
 
+    /**
+     * 对两个可空金额求和。
+     *
+     * @param left 左操作数
+     * @param right 右操作数
+     * @return 非空金额之和；仅一项非空时直接返回该项
+     */
     private BigDecimal add(BigDecimal left, BigDecimal right) {
         if (left == null) {
             return right;
@@ -118,10 +172,12 @@ public class DividendExtractService {
         return left.add(right);
     }
 
+    /** @return 金额绝对值，输入为空时返回 {@code null} */
     private BigDecimal abs(BigDecimal value) {
         return value == null ? null : value.abs();
     }
 
+    /** @return 原金额，输入为空时返回零 */
     private BigDecimal nullSafe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }

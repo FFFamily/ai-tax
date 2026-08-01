@@ -1,4 +1,4 @@
-package com.rcszh.tax.controller;
+package com.rcszh.tax.controller.task;
 
 import com.rcszh.tax.common.ApiResponse;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;

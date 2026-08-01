@@ -34,10 +34,13 @@ import java.util.stream.Collectors;
  */
 @Component
 public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
+    /** 股票数量、成本和收益计算使用的高精度数学上下文。 */
     private static final MathContext MC = MathContext.DECIMAL128;
 
     /**
      * 指定处理器优先级（越小越先执行）。
+     *
+     * @return 固定返回 100
      */
     @Override
     public int order() {
@@ -46,6 +49,8 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
     /**
      * 返回处理器名称（用于追踪）。
+     *
+     * @return 处理器名称 {@code stock-weighted-average}
      */
     @Override
     public String name() {
@@ -54,10 +59,15 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
     /**
      * 快速判断 records 是否包含“股票交易类”信息，以决定是否执行加权平均单价二次加工。
+     *
+     * @param parseResult AI 解析结果
+     * @param taskItem 当前文档任务项
+     * @param document 包含文档类型的元数据
+     * @return 文档类型包含“股票”时返回 {@code true}
      */
     @Override
     public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
-        // 快速嗅探
+        // documentType 是路由阶段识别的文档类型，用于避免扫描全部 records。
         String documentType = (String) document.get(DocumentServer.TYPE);
         return documentType.contains("股票");
     }
@@ -69,12 +79,19 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      * - SELL：按卖出前均价结转卖出成本（财产原值），若提供卖价则计算卖出额与收益/亏损
      *
      * 输出：仅保留“需要申报/纳税的记录”（卖出/股息），其他非股票类型 records 原样保留，方便后续扩展更多 processor。
+     *
+     * @param parseResult 包含原始股票流水并承载计算结果和告警的解析结果
+     * @param taskItem 当前文档任务项，本处理器当前不直接使用
+     * @param document 原始文档元数据，本方法当前不直接使用
      */
     @Override
     public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         // 将股票相关流水从 records 中抽出来加工；其他类型记录原样保留，方便后续扩展更多 processor
+        /** 预留的股票原始流水集合，用于后续恢复股票与其他记录分流。 */
         List<Map<String, Object>> stockRaw = new ArrayList<>();
+        /** 非股票记录集合，输出时保持原样。 */
         List<Map<String, Object>> others = new ArrayList<>();
+        /** AI 抽取的原始 records。 */
         List<Map<String, Object>> records = parseResult.getRecords();
 //        for (Map<String, Object> r : records) {
 //            if (isStockRelated(r)) stockRaw.add(r);
@@ -84,6 +101,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 //            return records;
 //        }
 
+        // events 是经过字段容错解析并按交易日期排序的标准股票事件。
         List<StockEvent> events = records.stream()
                 .map(StockEvent::from)
                 .filter(Objects::nonNull)
@@ -99,6 +117,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
         Map<StockGroupKey, List<StockEvent>> groupMap = events.stream()
                 .collect(Collectors.groupingBy(StockEvent::groupKey, LinkedHashMap::new, Collectors.toList()));
 
+        // out 汇总保留记录与后处理产生的申报记录。
         List<Map<String, Object>> out = new ArrayList<>(others);
         for (Map.Entry<StockGroupKey, List<StockEvent>> entry : groupMap.entrySet()) {
             StockGroupKey key = entry.getKey();
@@ -117,6 +136,11 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
     /**
      * 买入入账：累加持仓成本与数量，并重算均价。
+     *
+     * @param parseResult 用于记录无效买入流水告警
+     * @param ps 当前分组的持仓状态，首次买入时可为空
+     * @param e 当前买入事件
+     * @return 更新后的持仓状态；流水无效时返回 {@code null}
      */
     private static StockPositionState applyBuy(AIParseResult parseResult, StockPositionState ps, StockEvent e) {
         if (e.qty() == null || e.qty().compareTo(BigDecimal.ZERO) <= 0) {
@@ -139,6 +163,12 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
     /**
      * 卖出出账：按“卖出前均价”结转卖出成本（财产原值），更新持仓台账，并产出可申报的卖出明细记录。
+     *
+     * @param parseResult 用于回写收益字段和记录计算告警
+     * @param out 申报记录输出集合
+     * @param ps 卖出前持仓状态；为空时尝试查询历史持仓
+     * @param key 当前账户和股票标的分组键
+     * @param e 当前卖出事件
      */
     private static void applySell(AIParseResult parseResult, List<Map<String, Object>> out, StockPositionState ps, StockGroupKey key, StockEvent e) {
         if (e.qty() == null || e.qty().compareTo(BigDecimal.ZERO) == 0) {
@@ -182,7 +212,10 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
     }
 
     /**
-     * 获取历史股票数据信息
+     * 获取缺少买入流水时使用的历史股票持仓基线。
+     *
+     * @param stockEvent 当前卖出事件
+     * @return 根据股票代码构造的历史持仓状态
      */
     private static StockPositionState getHistoryStock(StockEvent stockEvent){
         String symbol = stockEvent.symbol();
@@ -202,6 +235,9 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
     /**
      * 生成用于告警的简要摘要（避免把整条 raw record 打到日志/告警里）。
+     *
+     * @param raw AI 抽取的原始股票记录
+     * @return 由日期、股票代码和交易动作组成的摘要
      */
     private static String safeSummary(Map<String, Object> raw) {
         if (raw == null) return "";

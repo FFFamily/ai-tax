@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
  * Map records 取值/解析工具（尽量容错）。
  */
 public final class RecordValueUtil {
+    /** 工具类不允许实例化。 */
     private RecordValueUtil() {}
 
     /**
@@ -109,6 +110,7 @@ public final class RecordValueUtil {
         }
     }
 
+    /** 匹配 {@code 4:1}、{@code 10：1} 等拆股或合股比例表达式。 */
     private static final Pattern SPLIT_PATTERN = Pattern.compile(
             "(?<a>\\d+(?:\\.\\d+)?)\\s*[:：]\\s*(?<b>\\d+(?:\\.\\d+)?)"
     );

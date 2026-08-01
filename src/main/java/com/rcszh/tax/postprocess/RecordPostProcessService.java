@@ -11,28 +11,36 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 对 AI 解析产出的 records 进行二次加工（可插拔、可扩展）。
+ * {@link RecordPostProcessor} 的统一编排服务。
  *
- * 说明：
- * - 解析层（AI）负责“抽取结构化 records”
- * - 二次加工层负责“基于 records 做业务计算/整形，产出可申报/可导出的 records”
+ * <p>解析层负责抽取结构化 records，本服务负责按优先级调用可插拔处理器，完成业务计算、
+ * 数据整形和质量校验。单个处理器失败不会中断后续处理，失败信息会写入解析结果 warnings。</p>
  */
 @Component
 public class RecordPostProcessService {
+    /**
+     * Spring 容器中注册的全部记录后处理器；执行前会按 {@link RecordPostProcessor#order()} 排序。
+     */
     @Resource
     private List<RecordPostProcessor> processors;
 
     /**
-     * 对 parseResult.records 进行二次加工：
-     * - 依次执行 supports=true 的处理器
-     * - 将最终结果回写到 parseResult.records
-     * - 将已执行的处理器名称写入 globalParam.postProcessApplied（便于追踪）
+     * 对解析结果执行完整的后处理链。
+     *
+     * <p>仅执行 {@code supports=true} 的处理器，并将成功执行的处理器名称写入
+     * {@code globalParam.postProcessApplied}，便于追踪本次结果经历的加工步骤。</p>
+     *
+     * @param parseResult 待加工的 AI 解析结果；为 {@code null} 时直接返回
+     * @param taskItem 当前文档任务项，透传给各处理器
+     * @param document 原始文档元数据，透传给各处理器
      */
     public void postProcess(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         if (parseResult == null) {
             return;
         }
+        // 仅记录成功完成 process 的处理器，失败处理器只在 warnings 中留痕。
         List<String> applied = new ArrayList<>();
+        // 创建有序快照，避免依赖 Spring 注入集合的原始顺序。
         List<RecordPostProcessor> orderedProcessors = processors == null ? List.of() : processors.stream()
                 .sorted(Comparator.comparingInt(RecordPostProcessor::order))
                 .toList();

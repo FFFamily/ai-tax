@@ -17,24 +17,47 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 股息处理链的质量校验与人工复核判定阶段。
+ *
+ * <p>对专项抽取记录执行格式标准化、金额勾稽、必填项、重复记录、抽取置信度和路由置信度检查，
+ * 并同步更新解析结果与任务项的人工复核状态。本处理器顺序为 70，是股息链路的最后一步。</p>
+ */
 @Component
 public class DividendQualityPostProcessor implements RecordPostProcessor {
+    /** @return 固定返回 70，确保质量检查在候选召回和专项抽取之后执行 */
     @Override
     public int order() {
         return 70;
     }
 
+    /** @return 用于追踪的处理器名称 {@code dividend-quality} */
     @Override
     public String name() {
         return "dividend-quality";
     }
 
+    /**
+     * 判断专项抽取阶段是否已产生待质检记录。
+     *
+     * @param parseResult 包含专项抽取结果的解析结果
+     * @param taskItem 当前文档任务项
+     * @param document 原始文档元数据
+     * @return 存在非空股息抽取记录列表时返回 {@code true}
+     */
     @Override
     public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
         Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         return records instanceof List<?> list && !list.isEmpty();
     }
 
+    /**
+     * 标准化并校验股息记录，汇总复核原因并回写任务状态。
+     *
+     * @param parseResult 承载股息记录、告警和全局复核标志的解析结果
+     * @param taskItem 用于同步人工复核状态和路由信息的任务项
+     * @param document 原始文档元数据，本方法当前不直接使用
+     */
     @Override
     @SuppressWarnings("unchecked")
     public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
@@ -43,9 +66,13 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
             return;
         }
         // 质量校验负责把“可抽取”进一步提升为“可复核、可导出、可追责”的记录。
+        // reviewed 保存标准化并附加逐条质检结果后的记录副本。
         List<Map<String, Object>> reviewed = new ArrayList<>();
+        // reviewReasons 汇总文档级复核原因，最终去重后同步到 parseResult 和 taskItem。
         List<String> reviewReasons = new ArrayList<>();
+        // 文档级人工复核标志，只要任一记录或路由存在风险即置为 true。
         boolean needHumanReview = false;
+        // duplicateGroups 保存确认重复的业务键，seenGroups 用于首次出现检测。
         Set<String> duplicateGroups = new HashSet<>();
         Set<String> seenGroups = new HashSet<>();
         for (Object item : list) {
@@ -111,6 +138,11 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         }
     }
 
+    /**
+     * 统一一条股息记录的日期、币种和金额，并根据已知金额补齐第三项。
+     *
+     * @param record 待原地标准化的股息记录 Map
+     */
     private void normalize(Map<String, Object> record) {
         // 统一日期、币种和金额格式，并尽量在净额/税额/毛额之间做自动补全。
         normalizeDate(record);
@@ -132,6 +164,12 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         }
     }
 
+    /**
+     * 检查记录的完整性、金额勾稽关系和证据行质量。
+     *
+     * @param record 已标准化的股息记录
+     * @return 当前记录的质量告警列表；空列表表示未发现问题
+     */
     private List<String> evaluate(Map<String, Object> record) {
         List<String> warnings = new ArrayList<>();
         // 这里关注的是“结果是否可申报/可解释”，而不是单纯字段是否非空。
@@ -176,6 +214,11 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         return warnings;
     }
 
+    /**
+     * 将股息日期转换为 {@code yyyy-MM-dd}；无法解析时保留原值供后续质检。
+     *
+     * @param record 待处理记录
+     */
     private void normalizeDate(Map<String, Object> record) {
         Object value = record.get("dividendDate");
         if (value == null || value.toString().isBlank()) {
@@ -187,6 +230,11 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         }
     }
 
+    /**
+     * 去除币种首尾空白并统一为大写。
+     *
+     * @param record 待处理记录
+     */
     private void normalizeCurrency(Map<String, Object> record) {
         Object value = record.get("currency");
         if (value == null || value.toString().isBlank()) {
@@ -195,6 +243,13 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         record.put("currency", value.toString().trim().toUpperCase());
     }
 
+    /**
+     * 将指定金额字段转换为非负 {@link BigDecimal} 并写回记录。
+     *
+     * @param record 待处理记录
+     * @param key 金额字段名
+     * @return 标准化金额；字段为空时返回 {@code null}
+     */
     private BigDecimal normalizeAmount(Map<String, Object> record, String key) {
         Object value = record.get(key);
         if (value == null || value.toString().isBlank()) {
@@ -205,6 +260,12 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         return normalized;
     }
 
+    /**
+     * 由日期、付款方、币种和毛额构造重复记录识别键。
+     *
+     * @param record 股息记录
+     * @return 重复识别键；所有组成字段均为空时返回空字符串
+     */
     private String buildDuplicateKey(Map<String, Object> record) {
         String date = stringValue(record.get("dividendDate"));
         String payer = stringValue(record.get("payer"));
@@ -216,6 +277,12 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         return String.join("|", date, payer, currency, gross);
     }
 
+    /**
+     * 向记录的质量告警集合追加一项，并保持结果去重。
+     *
+     * @param record 待更新记录
+     * @param warning 新增告警内容
+     */
     @SuppressWarnings("unchecked")
     private void appendWarning(Map<String, Object> record, String warning) {
         Object value = record.get("qualityWarnings");
@@ -226,10 +293,22 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
         record.put("qualityWarnings", warnings.stream().distinct().toList());
     }
 
+    /**
+     * 将任意字段值转换为去除首尾空白的字符串。
+     *
+     * @param value 字段值
+     * @return 字符串值，{@code null} 转为空字符串
+     */
     private String stringValue(Object value) {
         return value == null ? "" : value.toString().trim();
     }
 
+    /**
+     * 判断字段值是否为空。
+     *
+     * @param value 字段值
+     * @return 值为 {@code null} 或字符串为空白时返回 {@code true}
+     */
     private boolean isBlank(Object value) {
         return value == null || value.toString().isBlank();
     }
