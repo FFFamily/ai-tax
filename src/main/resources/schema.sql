@@ -94,6 +94,22 @@ CREATE TABLE IF NOT EXISTS tax_execution_task_file (
     KEY idx_execution_file_parse_item (parse_task_item_id)
 );
 
+CREATE TABLE IF NOT EXISTS tax_execution_task_attempt (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    execution_task_id BIGINT NOT NULL,
+    parse_task_id BIGINT NOT NULL,
+    attempt_no INT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    error_message VARCHAR(1000),
+    started_at DATETIME NOT NULL,
+    finished_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_execution_attempt_no (execution_task_id, attempt_no),
+    UNIQUE KEY uk_execution_attempt_parse_task (parse_task_id),
+    KEY idx_execution_attempt_task (execution_task_id)
+);
+
 CREATE TABLE IF NOT EXISTS tax_api_token (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     provider VARCHAR(64) NOT NULL,

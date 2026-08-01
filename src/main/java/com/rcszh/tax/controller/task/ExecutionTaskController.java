@@ -192,6 +192,20 @@ public class ExecutionTaskController {
     }
 
     /**
+     * 使用原材料重新提交失败的执行任务。
+     *
+     * @param taskId 待重新提交的用户执行任务 ID
+     * @return 重新提交后的任务详情
+     */
+    @Operation(summary = "重新提交失败任务", description = "使用原材料创建新的全量解析尝试")
+    @PostMapping("/{taskId}/retry")
+    public ApiResponse<ExecutionTaskDetailResponse> retry(
+            @PathVariable @Parameter(description = "待重新提交的用户执行任务 ID", required = true)
+            @Positive(message = "任务 ID 必须为正数") Long taskId) {
+        return ApiResponse.success(executionTaskService.retry(taskId));
+    }
+
+    /**
      * 通过用户执行任务查询其关联的内部解析结果。
      *
      * @param taskId 执行任务 ID

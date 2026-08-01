@@ -45,6 +45,7 @@ const canSubmit = computed(() => state.task?.status === 'COLLECTING'
   && state.task.fileCount > 0
   && !state.loading
   && !state.uploadingMaterial);
+const canRetry = computed(() => state.task?.status === 'FAILED' && !state.loading);
 const resultLabel = computed(() => records.value.length
   ? `${records.value.length} 条记录`
   : (state.task?.status === 'COMPLETED' ? '无结构化记录' : '等待处理结果'));
@@ -211,6 +212,23 @@ async function submitTask() {
     await loadResult(true);
     startPolling();
     notify('材料已锁定，任务开始处理', 'success');
+  } catch (error) {
+    notify(error.message, 'error');
+  } finally {
+    state.loading = false;
+  }
+}
+
+async function retryTask() {
+  if (!canRetry.value) return;
+  state.loading = true;
+  try {
+    state.task = await request(`/execution-tasks/${encodeURIComponent(state.task.id)}/retry`, { method: 'POST' });
+    state.result = null;
+    state.activeItemIndex = 0;
+    await Promise.all([loadTasks(true), loadResult(true)]);
+    startPolling();
+    notify('任务已重新提交', 'success');
   } catch (error) {
     notify(error.message, 'error');
   } finally {
@@ -396,7 +414,21 @@ onBeforeUnmount(stopPolling);
           </section>
 
           <template v-else>
-            <section v-if="state.task.errorMessage" class="processing-error"><span>处理失败</span><p>{{ state.task.errorMessage }}</p></section>
+            <section v-if="state.task.errorMessage" class="processing-error">
+              <div><span>处理失败</span><p>{{ state.task.errorMessage }}</p></div>
+              <button v-if="state.task.status === 'FAILED'" class="retry-command" type="button" :disabled="!canRetry" @click="retryTask">↻ <span>{{ state.loading ? '提交中' : '重新提交' }}</span></button>
+            </section>
+
+            <section v-if="state.task.attempts?.length" class="attempt-history">
+              <div class="attempt-history-heading"><div><span class="section-kicker">ATTEMPTS</span><h3>解析记录</h3></div><span>{{ state.task.attempts.length }} 次</span></div>
+              <div class="attempt-list">
+                <article v-for="attempt in state.task.attempts" :key="attempt.parseTaskId" class="attempt-row">
+                  <span class="attempt-number">{{ String(attempt.attemptNo).padStart(2, '0') }}</span>
+                  <div class="attempt-main"><strong>内部任务 {{ trimId(attempt.parseTaskId) }}</strong><small>{{ formatDate(attempt.startedAt) }}<template v-if="attempt.finishedAt"> · 完成于 {{ formatDate(attempt.finishedAt) }}</template></small><p v-if="attempt.errorMessage">{{ attempt.errorMessage }}</p></div>
+                  <span class="status-label" :class="({ PROCESSING: 'running', COMPLETED: 'success', FAILED: 'fail' })[attempt.status] || 'pending'">{{ attempt.statusLabel }}</span>
+                </article>
+              </div>
+            </section>
             <section class="artifact-section">
               <div class="artifact-heading">
                 <div><span class="section-number">01</span><h3>结构化记录</h3></div>

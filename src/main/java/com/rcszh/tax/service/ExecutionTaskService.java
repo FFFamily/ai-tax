@@ -5,6 +5,7 @@ import com.rcszh.tax.common.BusinessException;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
 import com.rcszh.tax.dto.executiontask.ExecutionIncomeTypeOptionResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionMaterialOptionResponse;
+import com.rcszh.tax.dto.executiontask.ExecutionTaskAttemptResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskDetailResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskFileResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskMaterialResponse;
@@ -13,10 +14,12 @@ import com.rcszh.tax.dto.executiontask.ExecutionTaskPageResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskSummaryResponse;
 import com.rcszh.tax.entity.task.TaxExecutionTask;
+import com.rcszh.tax.entity.task.TaxExecutionTaskAttempt;
 import com.rcszh.tax.entity.task.TaxExecutionTaskFile;
 import com.rcszh.tax.enums.ExecutionTaskStatusEnum;
 import com.rcszh.tax.enums.IncomeMaterialTypeEnum;
 import com.rcszh.tax.enums.OverseasIncomeTypeEnum;
+import com.rcszh.tax.mapper.TaxExecutionTaskAttemptMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
@@ -66,6 +69,8 @@ public class ExecutionTaskService {
 
     @Resource
     private TaxExecutionTaskMapper taskMapper;
+    @Resource
+    private TaxExecutionTaskAttemptMapper attemptMapper;
     @Resource
     private TaxExecutionTaskFileMapper fileMapper;
     @Resource
@@ -261,18 +266,38 @@ public class ExecutionTaskService {
         }
         requireCollecting(task);
         List<TaxExecutionTaskFile> files = listFiles(taskId);
-        if (files.isEmpty()) {
-            throw BusinessException.badRequest("至少上传一份材料后才能开始处理");
-        }
-        boolean hasRemoteFile = files.stream().anyMatch(file -> !ExcelUtil.checkFileSuffix(file.getOriginalFileName()));
-        if (hasRemoteFile && !storageService.hasPublicBaseUrl()) {
-            throw BusinessException.badRequest("PDF 或图片解析需要配置可公网访问的 APP_PUBLIC_BASE_URL");
-        }
+        validateSubmission(files);
+        return createParseAttempt(task, files, 1);
+    }
 
-        task.setStatus(ExecutionTaskStatusEnum.PROCESSING.name());
-        task.setSubmittedAt(LocalDateTime.now());
-        task.setErrorMessage(null);
-        taskMapper.updateById(task);
+    /**
+     * 使用原材料重新提交失败任务，并保留上一次内部解析任务。
+     *
+     * @param taskId 执行任务 ID
+     * @return 重新提交后的任务详情
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ExecutionTaskDetailResponse retry(Long taskId) {
+        TaxExecutionTask task = requireTaskForUpdate(taskId);
+        if (!ExecutionTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
+            throw BusinessException.conflict("只有处理失败的任务可以重新提交");
+        }
+        if (task.getParseTaskId() == null) {
+            throw BusinessException.conflict("失败任务未关联内部解析任务");
+        }
+        List<TaxExecutionTaskFile> files = listFiles(taskId);
+        validateSubmission(files);
+        ensureCurrentAttemptRecorded(task);
+        return createParseAttempt(task, files, nextAttemptNo(taskId));
+    }
+
+    /**
+     * 创建一套全新的内部解析任务和尝试记录。
+     */
+    private ExecutionTaskDetailResponse createParseAttempt(TaxExecutionTask task,
+                                                           List<TaxExecutionTaskFile> files,
+                                                           int attemptNo) {
+        LocalDateTime now = LocalDateTime.now();
 
         CreateDocumentTaskDto dto = new CreateDocumentTaskDto();
         CreateDocumentTaskDto.Item[] items = new CreateDocumentTaskDto.Item[files.size()];
@@ -282,19 +307,40 @@ public class ExecutionTaskService {
             CreateDocumentTaskDto.Item item = new CreateDocumentTaskDto.Item();
             item.setDocumentType(materialType.getRequestedDocumentType());
             boolean publicUrl = !ExcelUtil.checkFileSuffix(file.getOriginalFileName());
-            item.setFileUrl(storageService.buildExecutionFileUrl(taskId, file.getId(), publicUrl));
+            item.setFileUrl(storageService.buildExecutionFileUrl(task.getId(), file.getId(), publicUrl));
             items[index] = item;
         }
         dto.setItems(items);
         DocumentTaskServer.CreatedTask createdTask = documentTaskServer.createTaskWithItems(dto);
+
+        TaxExecutionTaskAttempt attempt = new TaxExecutionTaskAttempt();
+        attempt.setExecutionTaskId(task.getId());
+        attempt.setParseTaskId(createdTask.taskId());
+        attempt.setAttemptNo(attemptNo);
+        attempt.setStatus(ExecutionTaskStatusEnum.PROCESSING.name());
+        attempt.setStartedAt(now);
+        attempt.setCreatedAt(now);
+        attempt.setUpdatedAt(now);
+        attemptMapper.insert(attempt);
+
         task.setParseTaskId(createdTask.taskId());
-        taskMapper.updateById(task);
+        task.setStatus(ExecutionTaskStatusEnum.PROCESSING.name());
+        task.setSubmittedAt(now);
+        task.setErrorMessage(null);
+        task.setUpdatedAt(now);
+        taskMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<TaxExecutionTask>()
+                .eq(TaxExecutionTask::getId, task.getId())
+                .set(TaxExecutionTask::getParseTaskId, createdTask.taskId())
+                .set(TaxExecutionTask::getStatus, ExecutionTaskStatusEnum.PROCESSING.name())
+                .set(TaxExecutionTask::getSubmittedAt, now)
+                .set(TaxExecutionTask::getErrorMessage, null)
+                .set(TaxExecutionTask::getUpdatedAt, now));
         for (int index = 0; index < files.size(); index++) {
             TaxExecutionTaskFile file = files.get(index);
             file.setParseTaskItemId(createdTask.itemIds().get(index));
             fileMapper.updateById(file);
         }
-        eventPublisher.publishEvent(new DocumentParseTaskCreatedEvent(createdTask.taskId(), taskId));
+        eventPublisher.publishEvent(new DocumentParseTaskCreatedEvent(createdTask.taskId(), task.getId()));
         return detail(task, files);
     }
 
@@ -345,7 +391,74 @@ public class ExecutionTaskService {
         result.setComplete(missing.isEmpty());
         result.setSubmittedAt(task.getSubmittedAt());
         result.setErrorMessage(task.getErrorMessage());
+        result.setAttempts(listAttempts(task.getId()));
         return result;
+    }
+
+    /**
+     * 按最新尝试优先组装解析历史。
+     */
+    private List<ExecutionTaskAttemptResponse> listAttempts(Long taskId) {
+        return attemptMapper.selectList(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
+                        .eq(TaxExecutionTaskAttempt::getExecutionTaskId, taskId)
+                        .orderByDesc(TaxExecutionTaskAttempt::getAttemptNo))
+                .stream()
+                .map(this::attemptResponse)
+                .toList();
+    }
+
+    private ExecutionTaskAttemptResponse attemptResponse(TaxExecutionTaskAttempt attempt) {
+        ExecutionTaskAttemptResponse result = new ExecutionTaskAttemptResponse();
+        result.setAttemptNo(attempt.getAttemptNo());
+        result.setParseTaskId(attempt.getParseTaskId());
+        result.setStatus(attempt.getStatus());
+        result.setStatusLabel(statusLabel(attempt.getStatus()));
+        result.setErrorMessage(attempt.getErrorMessage());
+        result.setStartedAt(attempt.getStartedAt());
+        result.setFinishedAt(attempt.getFinishedAt());
+        return result;
+    }
+
+    /**
+     * 兼容迁移前已存在的失败任务，避免它们第一次重试时丢失原尝试。
+     */
+    private void ensureCurrentAttemptRecorded(TaxExecutionTask task) {
+        Long count = attemptMapper.selectCount(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
+                .eq(TaxExecutionTaskAttempt::getParseTaskId, task.getParseTaskId()));
+        if (count != null && count > 0) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        TaxExecutionTaskAttempt attempt = new TaxExecutionTaskAttempt();
+        attempt.setExecutionTaskId(task.getId());
+        attempt.setParseTaskId(task.getParseTaskId());
+        attempt.setAttemptNo(nextAttemptNo(task.getId()));
+        attempt.setStatus(task.getStatus());
+        attempt.setErrorMessage(task.getErrorMessage());
+        attempt.setStartedAt(task.getSubmittedAt() == null ? task.getCreatedAt() : task.getSubmittedAt());
+        attempt.setFinishedAt(task.getUpdatedAt() == null ? now : task.getUpdatedAt());
+        attempt.setCreatedAt(attempt.getStartedAt());
+        attempt.setUpdatedAt(now);
+        attemptMapper.insert(attempt);
+    }
+
+    private int nextAttemptNo(Long taskId) {
+        TaxExecutionTaskAttempt latest = attemptMapper.selectOne(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
+                .eq(TaxExecutionTaskAttempt::getExecutionTaskId, taskId)
+                .orderByDesc(TaxExecutionTaskAttempt::getAttemptNo)
+                .last("LIMIT 1"));
+        return latest == null ? 1 : latest.getAttemptNo() + 1;
+    }
+
+    private void validateSubmission(List<TaxExecutionTaskFile> files) {
+        if (files.isEmpty()) {
+            throw BusinessException.badRequest("至少上传一份材料后才能开始处理");
+        }
+        boolean hasRemoteFile = files.stream()
+                .anyMatch(file -> !ExcelUtil.checkFileSuffix(file.getOriginalFileName()));
+        if (hasRemoteFile && !storageService.hasPublicBaseUrl()) {
+            throw BusinessException.badRequest("PDF 或图片解析需要配置可公网访问的 APP_PUBLIC_BASE_URL");
+        }
     }
 
     /**

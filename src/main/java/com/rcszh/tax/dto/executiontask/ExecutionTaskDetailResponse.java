@@ -24,4 +24,7 @@ public class ExecutionTaskDetailResponse extends ExecutionTaskSummaryResponse {
 
     /** 处理失败原因，非失败状态为空。 */
     private String errorMessage;
+
+    /** 按尝试序号倒序排列的解析历史。 */
+    private List<ExecutionTaskAttemptResponse> attempts;
 }

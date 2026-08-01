@@ -198,9 +198,25 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .collection-score span { margin-top: 7px; color: var(--muted); font-size: 8px; }
 .missing-list h3 { margin: 0 0 15px; font: 700 17px Georgia, "Songti SC", serif; }
 .missing-list p { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: 10px; line-height: 1.5; }
-.processing-error { padding: 13px 24px; display: flex; gap: 12px; border-bottom: 1px solid #ecd2ce; color: var(--danger); background: #fff6f4; }
-.processing-error span { flex: 0 0 auto; font-size: 9px; font-weight: 700; }
-.processing-error p { margin: 0; font-size: 9px; line-height: 1.5; }
+.processing-error { padding: 13px 24px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid #ecd2ce; color: var(--danger); background: #fff6f4; }
+.processing-error > div { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.processing-error > div > span { flex: 0 0 auto; font-size: 9px; font-weight: 700; }
+.processing-error p { margin: 0; overflow-wrap: anywhere; font-size: 9px; line-height: 1.5; }
+.retry-command { min-height: 32px; padding: 0 11px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--danger); color: var(--danger); background: var(--white); font-size: 13px; }
+.retry-command span { font-size: 9px; font-weight: 700; }
+.retry-command:hover:not(:disabled) { color: var(--white); background: var(--danger); }
+.attempt-history { padding: 19px 24px 8px; border-bottom: 1px solid var(--line); background: #fafbfa; }
+.attempt-history-heading { margin-bottom: 10px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.attempt-history-heading h3 { margin: 3px 0 0; font-size: 14px; }
+.attempt-history-heading > span { color: var(--muted); font-size: 9px; }
+.attempt-list { border-top: 1px solid var(--line); }
+.attempt-row { min-height: 62px; padding: 10px 0; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: start; gap: 10px; border-bottom: 1px solid var(--line); }
+.attempt-number { color: var(--muted); font: 500 9px "DM Mono", monospace; }
+.attempt-main { min-width: 0; }
+.attempt-main strong, .attempt-main small { display: block; }
+.attempt-main strong { font-size: 10px; }
+.attempt-main small { margin-top: 3px; color: var(--muted); font-size: 8px; }
+.attempt-main p { margin: 6px 0 0; color: var(--danger); overflow-wrap: anywhere; font-size: 8px; line-height: 1.45; }
 .artifact-tools { display: flex; align-items: center; gap: 9px; }
 .artifact-tools select { height: 27px; padding: 0 7px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--white); font-size: 8px; }
 .task-summary { padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); background: #f7f9f5; }
@@ -294,6 +310,10 @@ td.primary-cell { font-weight: 700; }
   .task-summary { align-items: flex-start; flex-direction: column; padding: 15px 16px; }
   .summary-metrics { width: 100%; justify-content: space-between; }
   .artifact-section { padding: 19px 16px 22px; }
+  .processing-error { padding: 13px 16px; align-items: flex-start; }
+  .processing-error > div { display: block; }
+  .processing-error p { margin-top: 4px; }
+  .attempt-history { padding: 17px 16px 7px; }
   .review-fields { grid-template-columns: 1fr; }
   .result-foot { flex-direction: column; }
   .task-actions button span { display: none; }

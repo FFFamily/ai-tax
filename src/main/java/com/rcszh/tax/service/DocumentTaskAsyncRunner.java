@@ -52,11 +52,11 @@ public class DocumentTaskAsyncRunner {
             prepareRemoteTasks(parseTaskId);
             new TaskRunnable(parseTaskId, documentTaskServer, documentServer, pdfParser, excelParser,
                     recordPostProcessService).run();
-            executionTaskStateService.markCompleted(executionTaskId);
+            executionTaskStateService.markCompleted(executionTaskId, parseTaskId);
         } catch (Exception exception) {
             logger.error("解析任务执行失败: {}", parseTaskId, exception);
             markParseTaskFailed(parseTaskId);
-            executionTaskStateService.markFailed(executionTaskId, exception.getMessage());
+            executionTaskStateService.markFailed(executionTaskId, parseTaskId, exception.getMessage());
         }
     }
 
