@@ -23,7 +23,6 @@ import com.rcszh.tax.mapper.TaxExecutionTaskAttemptMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
-import com.rcszh.tax.util.ExcelUtil;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -306,8 +305,8 @@ public class ExecutionTaskService {
             IncomeMaterialTypeEnum materialType = parseMaterialType(file.getMaterialType());
             CreateDocumentTaskDto.Item item = new CreateDocumentTaskDto.Item();
             item.setDocumentType(materialType.getRequestedDocumentType());
-            boolean publicUrl = !ExcelUtil.checkFileSuffix(file.getOriginalFileName());
-            item.setFileUrl(storageService.buildExecutionFileUrl(task.getId(), file.getId(), publicUrl));
+            item.setFileUrl(storageService.buildExecutionFileUrl(
+                    task.getId(), file.getId(), file.getOriginalFileName(), false));
             items[index] = item;
         }
         dto.setItems(items);
@@ -453,11 +452,6 @@ public class ExecutionTaskService {
     private void validateSubmission(List<TaxExecutionTaskFile> files) {
         if (files.isEmpty()) {
             throw BusinessException.badRequest("至少上传一份材料后才能开始处理");
-        }
-        boolean hasRemoteFile = files.stream()
-                .anyMatch(file -> !ExcelUtil.checkFileSuffix(file.getOriginalFileName()));
-        if (hasRemoteFile && !storageService.hasPublicBaseUrl()) {
-            throw BusinessException.badRequest("PDF 或图片解析需要配置可公网访问的 APP_PUBLIC_BASE_URL");
         }
     }
 

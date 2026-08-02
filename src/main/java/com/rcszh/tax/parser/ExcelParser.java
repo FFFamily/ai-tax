@@ -8,17 +8,16 @@ import com.rcszh.tax.entity.ExcelFileRule;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.ir.ParsePreparationService;
-import com.rcszh.tax.route.DocumentRouter;
+import com.rcszh.tax.route.base.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
 import com.rcszh.tax.util.ExcelUtil;
-import com.rcszh.tax.util.FileUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
-import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -51,36 +50,29 @@ public class ExcelParser extends BaseParser{
         }else {
             excelFileRule = JSONUtil.toBean(fileRule, ExcelFileRule.class);
         }
-        File file = null;
-        try {
-            file = FileUtil.downloadFile(fileUrl);
-            List<ExcelParseResult> results = ExcelUtil.readExcel(file, excelFileRule);
-            // Excel 无需 OCR，直接把行列数据标准化后参与模板路由与后处理。
-            ParsePreparationResult preparation = parsePreparationService.prepareExcel(results);
-            Long documentId = resolveDocumentId(info, preparation, "excel", documentRouter);
-            logger.info("对应的文档Id：{}", documentId);
-            Map<String, Object> document = documentServer.getDocument(documentId);
-            if (document == null) {
-                logger.error("文件获取失败：{}", documentId);
-                return null;
-            }
-            info.setPreparedTransactionLines(preparation.getTransactionLines());
-            info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
-            String prompt = document.get(DocumentServer.PROMPT).toString();
-            List<Map<String, Object>> mapping = documentServer.getMapping(documentId);
-            prompt = replacePrompt(prompt,mapping);
-            if (prompt != null) {
-                AIParseResult aiParseResult = deepSeekAi.chat(results,prompt,null, document);
-                return attachTaskMetadata(attachPreparation(aiParseResult, preparation), info);
-            }
-            FileUtil.deleteTempFile(file);
-            return null;
-        } catch (IOException e) {
-            throw new RuntimeException("文件下载失败："+ e.getMessage());
-        }finally {
-            if (file != null) {
-                FileUtil.deleteTempFile(file);
-            }
+        Path localFilePath = info.getLocalFilePath();
+        if (localFilePath == null || !Files.isRegularFile(localFilePath)) {
+            throw new IllegalStateException("Excel 本地文件不存在: " + fileUrl);
         }
+        List<ExcelParseResult> results = ExcelUtil.readExcel(localFilePath.toFile(), excelFileRule);
+        // Excel 无需 OCR，直接把行列数据标准化后参与模板路由与后处理。
+        ParsePreparationResult preparation = parsePreparationService.prepareExcel(results);
+        Long documentId = resolveDocumentId(info, preparation, "excel", documentRouter);
+        logger.info("对应的文档Id：{}", documentId);
+        Map<String, Object> document = documentServer.getDocument(documentId);
+        if (document == null) {
+            logger.error("文件获取失败：{}", documentId);
+            return null;
+        }
+        info.setPreparedTransactionLines(preparation.getTransactionLines());
+        info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
+        String prompt = document.get(DocumentServer.PROMPT).toString();
+        List<Map<String, Object>> mapping = documentServer.getMapping(documentId);
+        prompt = replacePrompt(prompt,mapping);
+        if (prompt != null) {
+            AIParseResult aiParseResult = deepSeekAi.chat(results,prompt,null, document);
+            return attachTaskMetadata(attachPreparation(aiParseResult, preparation), info);
+        }
+        return null;
     }
 }

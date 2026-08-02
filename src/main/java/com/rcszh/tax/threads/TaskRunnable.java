@@ -9,15 +9,12 @@ import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.enums.RunTaskStatusEnum;
 import com.rcszh.tax.parser.BaseParser;
 import com.rcszh.tax.parser.DocumentParserRegistry;
-import com.rcszh.tax.parser.ExcelParser;
-import com.rcszh.tax.parser.PDFParser;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
 import com.rcszh.tax.server.DocumentServer;
 import com.rcszh.tax.server.DocumentTaskServer;
-import com.rcszh.tax.util.ExcelUtil;
-import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -27,60 +24,39 @@ public class TaskRunnable implements Runnable {
     private final Long taskId;
     private final DocumentTaskServer documentTaskServer;
     private final DocumentServer documentServer;
-    private final PDFParser pdfParser;
-    private final ExcelParser excelParser;
+    private final DocumentParserRegistry documentParserRegistry;
     private final RecordPostProcessService recordPostProcessService;
-    @Resource
-    private DocumentParserRegistry documentParserRegistry;
+    private final Map<Long, Path> localFilePaths;
+
     public TaskRunnable(Long taskId,
                         DocumentTaskServer documentTaskServer,
                         DocumentServer documentServer,
-                        PDFParser pdfParser,
-                        ExcelParser excelParser,
-                        RecordPostProcessService recordPostProcessService) {
+                        DocumentParserRegistry documentParserRegistry,
+                        RecordPostProcessService recordPostProcessService,
+                        Map<Long, Path> localFilePaths) {
         this.taskId = taskId;
         this.documentTaskServer = documentTaskServer;
         this.documentServer = documentServer;
-        this.pdfParser = pdfParser;
-        this.excelParser = excelParser;
+        this.documentParserRegistry = documentParserRegistry;
         this.recordPostProcessService = recordPostProcessService;
+        this.localFilePaths = localFilePaths == null ? Map.of() : Map.copyOf(localFilePaths);
     }
 
     @Override
     public void run() {
         logger.info("开始执行异步任务");
-        int tryCount = 0;
         DocumentTask task = documentTaskServer.getTaskAndItemById(taskId);
         if (task == null) {
             logger.warn("任务不存在: {}", taskId);
             return;
         }
         List<DocumentTaskItem> items = task.getItems();
-        boolean isSuccess = items.stream().allMatch(i -> i.getTaskResult() != null);
-        // 远程任务处理需要点时间
-        while (tryCount < 5 && !isSuccess) {
-            logger.info("第{}次执行远程任务", tryCount);
-            // PDF 会先在远端完成 OCR / 表格识别，这里统一轮询结果；Excel 不依赖该结果，会天然跳过。
-            documentTaskServer.getRemoteParseResult(items);
-            isSuccess = items.stream().allMatch(i -> i.getTaskResult() != null);
-            logger.info("远程任务执行结果：{}", isSuccess);
-            tryCount++;
-            if (!isSuccess) {
-                try {
-                    logger.info("远程任务执行失败，等待1分钟后重试");
-                    Thread.sleep(1000L * 60);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
-                }
-            }
-        }
+        items.forEach(item -> item.setLocalFilePath(localFilePaths.get(item.getId())));
 
         logger.info("开始解析文档");
         logger.info("需要解析的文档数量：{}", items.size());
 
         for (DocumentTaskItem item : items) {
-            String url = item.getFileUrl();
             // change_result 作为幂等标记，避免任务重跑时重复触发 AI 抽取和后处理。
             if (StrUtil.isNotBlank(item.getChangeResult())) {
                 logger.info("当前文件已经进行过AI解析,无需再次解析");
@@ -90,12 +66,13 @@ public class TaskRunnable implements Runnable {
                 AIParseResult parserResult;
                 // 依据文件类型进入不同预处理链路，但后续都收敛到统一的 AIParseResult。
                 BaseParser baseParser = documentParserRegistry.resolve(item);
+                if (baseParser.requiresRemoteParse() && StrUtil.isBlank(item.getTaskResult())) {
+                    throw new IllegalStateException("远程解析结果未准备完成: " + item.getFileUrl());
+                }
                 parserResult = baseParser.doParse(item);
-//                if (ExcelUtil.checkFileSuffix(url)) {
-//                    parserResult = excelParser.doParse(item);
-//                } else {
-//                    parserResult = pdfParser.doParse(item);
-//                }
+                if (parserResult == null) {
+                    throw new IllegalStateException("文档解析结果为空: " + item.getFileUrl());
+                }
                 Long resolvedDocumentId = item.getResolvedDocumentId();
                 if (resolvedDocumentId == null) {
                     resolvedDocumentId = item.getDocumentId();

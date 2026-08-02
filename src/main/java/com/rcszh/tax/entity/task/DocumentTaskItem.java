@@ -8,6 +8,7 @@ import com.rcszh.tax.ir.TransactionLine;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.List;
 
 @Data
@@ -70,4 +71,7 @@ public class DocumentTaskItem {
 
     @JsonIgnore
     private DocumentFeatures preparedDocumentFeatures;
+
+    @JsonIgnore
+    private Path localFilePath;
 }

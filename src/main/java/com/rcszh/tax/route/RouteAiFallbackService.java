@@ -25,6 +25,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 低置信规则路由的 AI 兜底服务。
+ *
+ * <p>AI 只能从调用方提供的模板候选集合中选择，不负责扩大候选范围。缺少模型配置、模型调用失败、
+ * 返回 UNKNOWN 或响应无法解析时均返回 {@code null}，由调用方继续使用规则结果。</p>
+ */
 @Component
 public class RouteAiFallbackService {
     @Resource
@@ -34,6 +40,13 @@ public class RouteAiFallbackService {
     @Resource
     private ReviewLearningService reviewLearningService;
 
+    /**
+     * 请求 AI 在候选模板中完成一次路由判断。
+     *
+     * @param context 当前文档的轻量路由特征
+     * @param candidates 已经过文档类型收窄的候选模板
+     * @return 可用的 AI 决策；服务不可用、无明确结论或响应异常时返回 {@code null}
+     */
     public RouteAiDecision decide(DocumentRouteContext context, List<Map<String, Object>> candidates) {
         if (candidates == null || candidates.isEmpty() || StrUtil.isBlank(appProperties.getAi().getDeepseekApiKey())) {
             return null;
@@ -53,6 +66,9 @@ public class RouteAiFallbackService {
         }
     }
 
+    /**
+     * 根据应用配置创建兼容 OpenAI 协议的 DeepSeek 聊天模型。
+     */
     private ChatModel buildChatModel() {
         OpenAiApi deepSeekApi = OpenAiApi.builder()
                 .apiKey(appProperties.getAi().getDeepseekApiKey())
@@ -64,6 +80,9 @@ public class RouteAiFallbackService {
                 .build();
     }
 
+    /**
+     * 构建限制模型只能选择候选模板并严格输出 JSON 的系统提示词。
+     */
     private String buildSystemPrompt() {
         return """
                 你是一个文档路由分类器。
@@ -73,6 +92,9 @@ public class RouteAiFallbackService {
                 """;
     }
 
+    /**
+     * 组装 AI 路由输入，包含文档上下文、模板规则、复核关键词和少量复核样例。
+     */
     private String buildUserPrompt(DocumentRouteContext context, List<Map<String, Object>> candidates) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("context", context);
@@ -113,6 +135,9 @@ public class RouteAiFallbackService {
                 """;
     }
 
+    /**
+     * 调用路由 Agent，并把提示词、原始响应或调用错误写入聊天日志。
+     */
     private String send(ReactAgent agent, String prompt) {
         ChatLog chatLog = new ChatLog();
         chatLog.setPrompt(prompt);
@@ -129,6 +154,12 @@ public class RouteAiFallbackService {
         }
     }
 
+    /**
+     * 将模型 JSON 响应转换为内部决策。
+     *
+     * <p>UNKNOWN 或空 documentId 表示模型无法确定，返回 {@code null}；缺少置信度时使用 0.50，
+     * 缺少人工复核标记时默认需要复核。</p>
+     */
     private RouteAiDecision parseDecision(String response) {
         if (StrUtil.isBlank(response)) {
             return null;
@@ -151,6 +182,9 @@ public class RouteAiFallbackService {
         return decision;
     }
 
+    /**
+     * 从 Markdown JSON 代码块或混合文本中提取首个完整 JSON 对象。
+     */
     private String extractJson(String response) {
         if (response.contains("```json")) {
             int start = response.indexOf("```json") + 7;

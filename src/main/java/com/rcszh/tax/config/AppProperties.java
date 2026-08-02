@@ -26,11 +26,16 @@ public class AppProperties {
 
     @Data
     public static class Mineru {
-        private String createTaskUrl = "https://mineru.net/api/v4/extract/task";
-        private String taskResultUrl = "https://mineru.net/api/v4/extract/task/";
+        private String createBatchUrl = "https://mineru.net/api/v4/file-urls/batch";
+        private String batchResultUrl = "https://mineru.net/api/v4/extract-results/batch/";
         private boolean ocr = false;
         private boolean enableFormula = false;
+        private boolean enableTable = true;
         private String modelVersion = "vlm";
+        private long pollIntervalMillis = 5000;
+        private long maxWaitMillis = 600000;
+        private int requestTimeoutSeconds = 60;
+        private int uploadTimeoutSeconds = 600;
         private String token = "";
     }
 }

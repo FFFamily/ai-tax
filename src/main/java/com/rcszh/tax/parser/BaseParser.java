@@ -6,7 +6,7 @@ import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.route.DocumentRouteContext;
 import com.rcszh.tax.route.DocumentRouteResult;
-import com.rcszh.tax.route.DocumentRouter;
+import com.rcszh.tax.route.base.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
 
 import java.math.BigDecimal;
@@ -87,6 +87,20 @@ public abstract class BaseParser {
         return parseResult;
     }
 
+    /**
+     * 解析任务项最终使用的文档模板。
+     *
+     * <p>任务项已显式指定模板时直接采用并记录为人工来源；否则根据预处理特征构建
+     * {@link DocumentRouteContext} 调用 {@link DocumentRouter}。路由成功后把模板、置信度、
+     * 来源和原因同步回任务项，供后处理、结果展示和人工复核使用。</p>
+     *
+     * @param info 当前解析任务项，也是路由结果的回写载体
+     * @param preparation 文档预处理结果，提供关键词、表头等路由特征
+     * @param fileType 归一化后的文件类型
+     * @param documentRouter 文档模板路由器
+     * @return 最终采用的文档模板 ID
+     * @throws RuntimeException 自动路由未找到有效模板时抛出
+     */
     protected Long resolveDocumentId(DocumentTaskItem info,
                                        ParsePreparationResult preparation,
                                        String fileType,

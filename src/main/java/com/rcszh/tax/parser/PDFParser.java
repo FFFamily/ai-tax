@@ -1,6 +1,5 @@
 package com.rcszh.tax.parser;
 
-import cn.hutool.core.io.FileTypeUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.ai.DeepSeekAi;
@@ -10,15 +9,15 @@ import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.ir.ParsePreparationService;
-import com.rcszh.tax.route.DocumentRouter;
+import com.rcszh.tax.route.base.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,7 +43,7 @@ public class PDFParser extends BaseParser{
     }
     @Override
     public boolean supports(DocumentTaskItem item) {
-        return item.getFileUrl().contains("pdf");
+        return item.getFileUrl() != null && item.getFileUrl().toLowerCase(Locale.ROOT).contains(".pdf");
     }
 
     @Override

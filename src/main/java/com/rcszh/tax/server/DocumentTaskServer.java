@@ -1,7 +1,6 @@
 package com.rcszh.tax.server;
 
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultItemResponse;
@@ -15,23 +14,19 @@ import com.rcszh.tax.enums.RunTaskStatusEnum;
 import com.rcszh.tax.mapper.TaxTaskItemMapper;
 import com.rcszh.tax.mapper.TaxTaskMapper;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class DocumentTaskServer {
-    private static final Logger logger = LoggerFactory.getLogger(DocumentTaskServer.class);
     public record CreatedTask(Long taskId, List<Long> itemIds) { }
     @Resource
     private TaxTaskMapper taxTaskMapper;
     @Resource
     private TaxTaskItemMapper taxTaskItemMapper;
-    @Resource
-    private ParseFileServer parseFileServer;
 
     @Transactional(rollbackFor = Exception.class)
     public Long createTask(CreateDocumentTaskDto dto) {
@@ -105,33 +100,23 @@ public class DocumentTaskServer {
         taxTaskItemMapper.updateById(toTaxTaskItem(taskItem));
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void updateTaskResults(Map<Long, String> taskResults) {
+        for (Map.Entry<Long, String> entry : taskResults.entrySet()) {
+            TaxTaskItem item = new TaxTaskItem();
+            item.setId(entry.getKey());
+            item.setTaskResult(entry.getValue());
+            if (taxTaskItemMapper.updateById(item) != 1) {
+                throw new IllegalStateException("任务项结果写入失败: " + entry.getKey());
+            }
+        }
+    }
+
     public void updateTask(DocumentTask task) {
         TaxTask taxTask = new TaxTask();
         taxTask.setId(task.getId());
         taxTask.setStatus(task.getStatus());
         taxTaskMapper.updateById(taxTask);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void getRemoteParseResult(List<DocumentTaskItem> taskItems) {
-        for (DocumentTaskItem taskItem : taskItems) {
-            if (StrUtil.isNotBlank(taskItem.getTaskResult())) {
-                continue;
-            }
-            String remoteTaskId = taskItem.getRemoteTaskId();
-            if (StrUtil.isBlank(remoteTaskId)) {
-                logger.info("任务项{} remote_task_id 为空，无需远程解析", taskItem.getId());
-                taskItem.setTaskResult("");
-                continue;
-            }
-            JSONArray parseResult = parseFileServer.getParseResult(remoteTaskId);
-            if (parseResult == null) {
-                logger.info("任务项{} 解析失败，文档返回为空", taskItem.getId());
-                continue;
-            }
-            taskItem.setTaskResult(parseResult.toString());
-            updateTaskItem(taskItem);
-        }
     }
 
     private DocumentTask toDocumentTask(TaxTask task, List<TaxTaskItem> taskItems) {

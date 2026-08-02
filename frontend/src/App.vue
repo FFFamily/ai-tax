@@ -49,6 +49,38 @@ const canRetry = computed(() => state.task?.status === 'FAILED' && !state.loadin
 const resultLabel = computed(() => records.value.length
   ? `${records.value.length} 条记录`
   : (state.task?.status === 'COMPLETED' ? '无结构化记录' : '等待处理结果'));
+const materialProgress = computed(() => {
+  const expected = Number(state.task?.expectedMaterialCount || 0);
+  return expected ? Math.round((Number(state.task?.uploadedMaterialCount || 0) / expected) * 100) : 0;
+});
+const taskPhase = computed(() => ({
+  COLLECTING: 2,
+  PROCESSING: 3,
+  COMPLETED: 4,
+  FAILED: 3
+}[state.task?.status] || 1));
+const reviewWarnings = computed(() => {
+  const warnings = [];
+  const append = (value) => {
+    if (Array.isArray(value)) warnings.push(...value.filter(Boolean).map(String));
+    else if (value) warnings.push(String(value));
+  };
+  append(parsedResult.value.warnings);
+  append(parsedResult.value.globalParam?.reviewReasons);
+  append(activeItem.value.review_reasons);
+  records.value.forEach((record) => append(record.qualityWarnings || record.warnings));
+  return [...new Set(warnings)];
+});
+const evidenceRows = computed(() => records.value.flatMap((record, recordIndex) => {
+  const rowIds = Array.isArray(record.evidenceRowIds) ? record.evidenceRowIds : [];
+  return rowIds.map((rowId) => ({
+    rowId,
+    recordIndex: recordIndex + 1,
+    payer: record.payer || `记录 ${recordIndex + 1}`,
+    detail: formatEvidenceDetail(record.evidence?.[rowId])
+  }));
+}));
+const routeConfidence = computed(() => routeSummary.value.confidence ?? activeItem.value.route_confidence);
 
 async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
@@ -81,6 +113,23 @@ function formatSize(value) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+function formatConfidence(value) {
+  if (value == null || value === '') return '待评估';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${Math.round(number * 100)}%` : String(value);
+}
+function formatEvidenceDetail(evidence) {
+  if (!evidence || typeof evidence !== 'object') return '已关联原始证据行';
+  const location = [
+    evidence.sheetName,
+    evidence.page != null ? `第 ${Number(evidence.page) + 1} 页` : '',
+    evidence.rowIndex != null ? `第 ${evidence.rowIndex} 行` : ''
+  ].filter(Boolean).join(' · ');
+  const cells = evidence.cells && typeof evidence.cells === 'object'
+    ? Object.values(evidence.cells).filter((value) => value != null && value !== '').slice(0, 4).join(' / ')
+    : '';
+  return [location, cells].filter(Boolean).join(' · ') || '已关联原始证据行';
 }
 
 async function loadOptions() {
@@ -309,7 +358,7 @@ onBeforeUnmount(stopPolling);
         <span><strong>Taxroom</strong><small>境外所得材料工作台</small></span>
       </a>
       <div class="topbar-center">
-        <span class="workspace-name">执行任务</span><span class="workspace-separator">/</span><span class="workspace-mode">Agent workspace</span>
+        <span class="workspace-name">Agent 协作台</span><span class="workspace-separator">/</span><span class="workspace-mode">Dialogue + Data workspace</span>
       </div>
       <div class="topbar-meta"><span class="live-dot" :class="{ success: state.backendOnline }"></span><span>{{ state.backendOnline ? '服务正常' : '服务未连接' }}</span></div>
     </header>
@@ -318,7 +367,7 @@ onBeforeUnmount(stopPolling);
       <aside class="session-rail">
         <div class="rail-heading">
           <div><span class="section-kicker">TASKS</span><h2>任务记录</h2></div>
-          <button class="icon-button" type="button" title="新建任务" @click="state.showCreate = true">+</button>
+          <button class="icon-button" type="button" title="新建任务" aria-label="新建任务" @click="state.showCreate = true">+</button>
         </div>
         <div class="recent-list">
           <div v-if="!state.tasks.length && !state.listLoading" class="rail-empty"><span class="empty-glyph">+</span><strong>暂无任务</strong><small>创建第一项境外所得执行任务</small></div>
@@ -328,7 +377,7 @@ onBeforeUnmount(stopPolling);
             <span class="recent-arrow">›</span>
           </button>
         </div>
-        <div class="rail-footer"><span class="connection-label">CONNECTION</span><div><span class="live-dot" :class="{ success: state.backendOnline }"></span>{{ state.backendOnline ? 'Spring Boot 已连接' : '等待 localhost:8080' }}</div></div>
+        <div class="rail-footer"><span class="connection-label">CONNECTION</span><div><span class="live-dot" :class="{ success: state.backendOnline }"></span>{{ state.backendOnline ? '服务已连接' : '等待服务连接' }}</div></div>
       </aside>
 
       <section class="conversation-panel">
@@ -338,7 +387,7 @@ onBeforeUnmount(stopPolling);
         </header>
 
         <div v-if="state.showCreate || !state.task" class="creation-view">
-          <div class="creation-heading"><span class="section-kicker">NEW TASK</span><h2>选择境外所得类型</h2><p>每项任务对应一种所得，创建后将生成专属材料清单。</p></div>
+          <div class="creation-heading"><span class="section-kicker">INTENT</span><h2>这次要处理哪类所得？</h2><p>选择所得类型后，Agent 会建立任务并在右侧工作台生成材料与数据区。</p></div>
           <div class="income-options">
             <label v-for="(option, index) in state.options" :key="option.code" class="income-option" :class="{ selected: state.selectedIncomeType === option.code }">
               <input v-model="state.selectedIncomeType" type="radio" :value="option.code" />
@@ -350,56 +399,66 @@ onBeforeUnmount(stopPolling);
           <button class="primary-command" type="button" :disabled="state.loading || !state.selectedIncomeType" @click="createTask">创建任务 <span>→</span></button>
         </div>
 
-        <template v-else>
-          <div class="material-stream">
-            <div class="material-overview">
-              <div><span class="section-kicker">MATERIALS</span><h2>材料清单</h2></div>
-              <strong>{{ state.task.uploadedMaterialCount }}/{{ state.task.expectedMaterialCount }}</strong>
+        <div v-else class="conversation-stream">
+          <div class="date-divider">CURRENT SESSION</div>
+
+          <article class="message user-message">
+            <div class="message-body"><div class="message-meta"><strong>你</strong><span>{{ formatDate(state.task.createdAt) }}</span></div><p>需要处理 <b>{{ state.task.incomeTypeLabel }}</b> 相关材料，并整理成可导出的结构化记录。</p></div>
+          </article>
+
+          <article class="message agent-message">
+            <span class="message-avatar">T</span>
+            <div class="message-body">
+              <div class="message-meta"><strong>Tax Agent</strong><span>INTENT</span></div>
+              <p>已识别为“{{ state.task.incomeTypeLabel }}”处理任务。我会结合材料完整度、文档路由和质量规则推进处理。</p>
+              <div class="capability-row"><span>意图已确认</span><span>{{ state.task.expectedMaterialCount }} 项材料</span><span>{{ state.task.fileCount }} 份文件</span></div>
             </div>
-            <div class="completion-track"><i :style="{ width: `${Math.round((state.task.uploadedMaterialCount / state.task.expectedMaterialCount) * 100)}%` }"></i></div>
+          </article>
 
-            <article v-for="(material, index) in state.task.materials" :key="material.code" class="material-row" :class="{ uploaded: material.uploaded }">
-              <div class="material-row-head">
-                <span class="material-number">{{ String(index + 1).padStart(2, '0') }}</span>
-                <div><h3>{{ material.label }}</h3><small>{{ material.files.length ? `${material.files.length} 个文件` : '尚未上传' }}</small></div>
-                <span class="material-state">{{ material.uploaded ? '已就绪' : '待补充' }}</span>
-              </div>
-              <div v-if="material.files.length" class="file-list">
-                <div v-for="file in material.files" :key="file.id" class="file-item">
-                  <a :href="`${API_PREFIX}${file.downloadUrl}`" target="_blank" rel="noopener"><span class="file-extension">{{ file.extension }}</span><span><strong>{{ file.name }}</strong><small>{{ formatSize(file.size) }}</small></span></a>
-                  <button v-if="state.task.status === 'COLLECTING'" type="button" title="删除文件" @click="deleteFile(file)">×</button>
-                </div>
-              </div>
-              <label v-if="state.task.status === 'COLLECTING'" class="upload-command" :class="{ busy: state.uploadingMaterial === material.code }">
-                <input type="file" multiple accept=".pdf,.xls,.xlsx,.xlsm,.xlsb,.csv,.png,.jpg,.jpeg" :disabled="Boolean(state.uploadingMaterial)" @change="uploadFiles(material, $event)" />
-                <span>{{ state.uploadingMaterial === material.code ? '上传中…' : '+ 添加文件' }}</span>
-              </label>
-            </article>
-          </div>
+          <article v-if="state.task.status === 'COLLECTING'" class="message agent-message followup-message">
+            <span class="message-avatar">?</span>
+            <div class="message-body"><div class="message-meta"><strong>追问与补充</strong><span>FOLLOW-UP</span></div><p v-if="state.task.missingMaterialCount">目前还有 <b>{{ state.task.missingMaterialCount }}</b> 项材料未补充。请在右侧“文件与材料”区上传，也可按当前材料直接开始处理。</p><p v-else>材料清单已完整，可在右侧工作台开始处理。</p></div>
+          </article>
 
-          <footer class="task-submit-bar">
-            <div><strong>{{ state.task.complete ? '材料已齐备' : `缺少 ${state.task.missingMaterialCount} 项` }}</strong><small>{{ state.task.status === 'COLLECTING' ? '缺失材料不影响提交' : '任务材料已锁定' }}</small></div>
-            <button v-if="state.task.status === 'COLLECTING'" class="submit-command" type="button" :disabled="!canSubmit" @click="submitTask">开始处理 <span>→</span></button>
-            <span v-else class="locked-label">已锁定</span>
-          </footer>
-        </template>
+          <section class="agent-block progress-block">
+            <div class="agent-block-heading"><div><span class="section-kicker">PROGRESS</span><h2>处理进度</h2></div><strong>{{ taskPhase }}/4</strong></div>
+            <ol class="phase-list">
+              <li :class="{ done: taskPhase >= 1 }"><span>01</span><div><strong>理解意图</strong><small>所得类型与任务范围</small></div></li>
+              <li :class="{ done: taskPhase >= 2 }"><span>02</span><div><strong>收集材料</strong><small>{{ state.task.uploadedMaterialCount }}/{{ state.task.expectedMaterialCount }} 项已就绪</small></div></li>
+              <li :class="{ done: taskPhase >= 3, active: state.task.status === 'PROCESSING' || state.task.status === 'FAILED' }"><span>03</span><div><strong>解析与校验</strong><small>{{ state.task.status === 'FAILED' ? '等待重试' : state.task.status === 'PROCESSING' ? '正在处理' : '路由、抽取与质量检查' }}</small></div></li>
+              <li :class="{ done: taskPhase >= 4 }"><span>04</span><div><strong>复核与导出</strong><small>{{ state.task.status === 'COMPLETED' ? '结果已生成' : '等待结构化结果' }}</small></div></li>
+            </ol>
+          </section>
+
+          <section class="agent-block decision-block">
+            <div class="agent-block-heading"><div><span class="section-kicker">AGENT DECISION</span><h2>Agent 决策</h2></div><span class="decision-confidence">{{ formatConfidence(routeConfidence) }}</span></div>
+            <dl class="decision-grid">
+              <div><dt>处理路径</dt><dd>{{ routeSummary.variant || activeItem.route_variant || (state.task.status === 'COLLECTING' ? '等待提交后路由' : '正在确定模板') }}</dd></div>
+              <div><dt>人工介入</dt><dd>{{ review.needHumanReview ? '需要复核' : '尚未要求' }}</dd></div>
+              <div v-if="routeSummary.reason || activeItem.route_reason" class="decision-reason"><dt>决策依据</dt><dd>{{ routeSummary.reason || activeItem.route_reason }}</dd></div>
+            </dl>
+          </section>
+
+          <div v-if="state.task.status === 'FAILED'" class="system-message error"><span class="system-rule"></span><p>本轮处理未完成，请在右侧异常区查看详情并重新提交。</p></div>
+          <div v-else-if="state.task.status === 'COMPLETED'" class="system-message success"><span class="system-rule"></span><p>处理已完成，右侧已生成 {{ resultLabel }}，可继续复核或导出。</p></div>
+        </div>
 
         <div v-if="state.notice" class="toast-message" :class="state.noticeType"><span></span>{{ state.notice }}</div>
       </section>
 
       <section class="workspace-panel">
         <header class="workspace-header">
-          <div><span class="section-kicker">ARTIFACTS</span><h2>{{ state.task ? '任务工作区' : '处理结果' }}</h2></div>
+          <div><span class="section-kicker">DATA WORKSPACE</span><h2>{{ state.task ? '文件与数据工作台' : '处理结果' }}</h2></div>
           <div v-if="state.task" class="task-actions">
-            <button class="icon-text-button" type="button" title="刷新任务" @click="refreshCurrent()">↻ <span>刷新</span></button>
+            <button class="icon-text-button" type="button" title="刷新任务" aria-label="刷新任务" @click="refreshCurrent()">↻ <span>刷新</span></button>
             <button class="export-button" type="button" :disabled="state.task.status !== 'COMPLETED'" @click="exportTask">↓ <span>导出 Excel</span></button>
           </div>
         </header>
 
         <div v-if="!state.task || state.showCreate" class="workspace-empty">
-          <div class="document-placeholder"><span class="document-corner"></span><b>01</b><i></i><i></i><i></i><small>TAX DOCUMENT</small></div>
-          <h3>等待任务</h3><p>创建任务后，材料完整度、处理状态和结构化结果会集中显示在这里。</p>
-          <div class="empty-process"><span><b>01</b> 选择所得</span><span><b>02</b> 上传材料</span><span><b>03</b> 提交处理</span><span><b>04</b> 结果复核</span></div>
+          <div class="document-placeholder"><span class="document-corner"></span><b>DATA</b><i></i><i></i><i></i><small>TAX WORKSPACE</small></div>
+          <h3>等待任务</h3><p>完成左侧意图选择后，文件、结构化记录、证据行、异常与导出结果将集中在这里。</p>
+          <div class="empty-process"><span><b>01</b> 文件</span><span><b>02</b> 结构化记录</span><span><b>03</b> 证据与异常</span><span><b>04</b> 复核导出</span></div>
         </div>
 
         <div v-else class="workspace-content">
@@ -408,12 +467,43 @@ onBeforeUnmount(stopPolling);
             <div class="summary-metrics"><div><small>所得类型</small><strong>{{ state.task.incomeTypeLabel }}</strong></div><div><small>状态</small><span class="status-label" :class="statusClass">{{ state.task.statusLabel }}</span></div><div><small>文件</small><strong>{{ state.task.fileCount }} 份</strong></div></div>
           </section>
 
-          <section v-if="state.task.status === 'COLLECTING'" class="collection-summary">
-            <div class="collection-score"><strong>{{ Math.round((state.task.uploadedMaterialCount / state.task.expectedMaterialCount) * 100) }}%</strong><span>材料完整度</span></div>
-            <div class="missing-list"><span class="section-kicker">PENDING</span><h3>{{ state.task.missingMaterialCount ? '仍待补充的材料' : '材料清单已完整' }}</h3><p v-for="material in state.task.missingMaterials" :key="material.code">{{ material.label }}</p><p v-if="!state.task.missingMaterialCount">可以提交进入处理流程。</p></div>
+          <div class="workspace-index" aria-label="工作台内容概览">
+            <span><b>01</b>文件 {{ state.task.fileCount }}</span><span><b>02</b>记录 {{ records.length }}</span><span><b>03</b>证据 {{ evidenceRows.length }}</span><span :class="{ alert: reviewWarnings.length || state.task.errorMessage }"><b>04</b>异常 {{ reviewWarnings.length + (state.task.errorMessage ? 1 : 0) }}</span>
+          </div>
+
+          <section class="artifact-section files-section">
+            <div class="artifact-heading">
+              <div><span class="section-number">01</span><h3>文件与材料</h3></div>
+              <span class="record-count">{{ state.task.uploadedMaterialCount }}/{{ state.task.expectedMaterialCount }} 项 · {{ materialProgress }}%</span>
+            </div>
+            <div class="completion-track"><i :style="{ width: `${materialProgress}%` }"></i></div>
+            <div class="material-grid">
+              <article v-for="(material, index) in state.task.materials" :key="material.code" class="material-row" :class="{ uploaded: material.uploaded }">
+                <div class="material-row-head">
+                  <span class="material-number">{{ String(index + 1).padStart(2, '0') }}</span>
+                  <div><h3>{{ material.label }}</h3><small>{{ material.files.length ? `${material.files.length} 个文件` : '尚未上传' }}</small></div>
+                  <span class="material-state">{{ material.uploaded ? '已就绪' : '待补充' }}</span>
+                </div>
+                <div v-if="material.files.length" class="file-list">
+                  <div v-for="file in material.files" :key="file.id" class="file-item">
+                    <a :href="`${API_PREFIX}${file.downloadUrl}`" target="_blank" rel="noopener"><span class="file-extension">{{ file.extension }}</span><span><strong>{{ file.name }}</strong><small>{{ formatSize(file.size) }}</small></span></a>
+                    <button v-if="state.task.status === 'COLLECTING'" type="button" title="删除文件" aria-label="删除文件" @click="deleteFile(file)">×</button>
+                  </div>
+                </div>
+                <label v-if="state.task.status === 'COLLECTING'" class="upload-command" :class="{ busy: state.uploadingMaterial === material.code }">
+                  <input type="file" multiple accept=".pdf,.xls,.xlsx,.xlsm,.xlsb,.csv,.png,.jpg,.jpeg" :disabled="Boolean(state.uploadingMaterial)" @change="uploadFiles(material, $event)" />
+                  <span>{{ state.uploadingMaterial === material.code ? '上传中…' : '+ 添加文件' }}</span>
+                </label>
+              </article>
+            </div>
+            <footer class="task-submit-bar">
+              <div><strong>{{ state.task.complete ? '材料已齐备' : `缺少 ${state.task.missingMaterialCount} 项` }}</strong><small>{{ state.task.status === 'COLLECTING' ? '可继续补充，也可按当前文件提交' : '任务材料已锁定' }}</small></div>
+              <button v-if="state.task.status === 'COLLECTING'" class="submit-command" type="button" :disabled="!canSubmit" @click="submitTask">开始处理 <span>→</span></button>
+              <span v-else class="locked-label">已锁定</span>
+            </footer>
           </section>
 
-          <template v-else>
+          <template v-if="state.task.status !== 'COLLECTING'">
             <section v-if="state.task.errorMessage" class="processing-error">
               <div><span>处理失败</span><p>{{ state.task.errorMessage }}</p></div>
               <button v-if="state.task.status === 'FAILED'" class="retry-command" type="button" :disabled="!canRetry" @click="retryTask">↻ <span>{{ state.loading ? '提交中' : '重新提交' }}</span></button>
@@ -431,7 +521,7 @@ onBeforeUnmount(stopPolling);
             </section>
             <section class="artifact-section">
               <div class="artifact-heading">
-                <div><span class="section-number">01</span><h3>结构化记录</h3></div>
+                <div><span class="section-number">02</span><h3>结构化记录</h3></div>
                 <div class="artifact-tools">
                   <select v-if="state.result?.items?.length > 1" :value="state.activeItemIndex" @change="selectResultItem($event.target.value)"><option v-for="(resultItem, index) in state.result.items" :key="resultItem.id" :value="index">文件 {{ index + 1 }}</option></select>
                   <span class="record-count">{{ resultLabel }}</span>
@@ -439,13 +529,27 @@ onBeforeUnmount(stopPolling);
               </div>
               <div class="results-content">
                 <div v-if="!records.length" class="empty-result"><span class="empty-icon">∅</span><strong>{{ state.task.status === 'PROCESSING' ? '正在等待解析结果' : '没有可展示的记录' }}</strong><small>{{ parsedResult.warnings?.[0] || activeItem.review_reasons || state.task.errorMessage || '当前材料类型尚未配置专属抽取模板。' }}</small></div>
-                <div v-else class="table-wrap"><table><thead><tr><th>日期</th><th>付款方</th><th>币种</th><th>净额</th><th>预扣税</th><th>毛额</th><th>置信度</th></tr></thead><tbody><tr v-for="(record, index) in records" :key="record.record_id || index"><td>{{ record.dividendDate || '—' }}</td><td class="primary-cell">{{ record.payer || '—' }}</td><td>{{ record.currency || '—' }}</td><td>{{ record.netAmount ?? '—' }}</td><td>{{ record.withholdingTax ?? '—' }}</td><td>{{ record.grossAmount ?? '—' }}</td><td>{{ record.confidence != null ? Math.round(Number(record.confidence) * 100) + '%' : '—' }}</td></tr></tbody></table></div>
+                <div v-else class="table-wrap"><table><thead><tr><th>#</th><th>日期</th><th>付款方</th><th>币种</th><th>净额</th><th>预扣税</th><th>毛额</th><th>证据行</th><th>置信度</th><th>质量</th></tr></thead><tbody><tr v-for="(record, index) in records" :key="record.record_id || index"><td class="row-index">{{ String(index + 1).padStart(2, '0') }}</td><td>{{ record.dividendDate || '—' }}</td><td class="primary-cell">{{ record.payer || '—' }}</td><td>{{ record.currency || '—' }}</td><td>{{ record.netAmount ?? '—' }}</td><td>{{ record.withholdingTax ?? '—' }}</td><td>{{ record.grossAmount ?? '—' }}</td><td><span class="evidence-chip">{{ record.evidenceRowIds?.length || 0 }} 行</span></td><td>{{ formatConfidence(record.confidence) }}</td><td><span class="quality-label" :class="{ alert: record.needHumanReview || record.qualityWarnings?.length }">{{ record.needHumanReview || record.qualityWarnings?.length ? '待复核' : '通过' }}</span></td></tr></tbody></table></div>
               </div>
               <div v-if="state.result" class="result-foot"><span>内部任务 {{ trimId(state.task.parseTaskId) }}</span><span>{{ routeSummary.variant || activeItem.route_variant || '等待模板路由' }}</span></div>
             </section>
 
+            <section class="artifact-section evidence-section">
+              <div class="artifact-heading"><div><span class="section-number">03</span><h3>证据行</h3></div><span class="record-count">{{ evidenceRows.length }} ROWS</span></div>
+              <div v-if="evidenceRows.length" class="evidence-list">
+                <article v-for="evidence in evidenceRows" :key="`${evidence.recordIndex}-${evidence.rowId}`" class="evidence-row"><span class="evidence-id">{{ evidence.rowId }}</span><div><strong>{{ evidence.payer }}</strong><small>{{ evidence.detail }}</small></div><span class="record-link">记录 {{ evidence.recordIndex }}</span></article>
+              </div>
+              <div v-else class="compact-empty">当前结果尚未关联可展示的原始证据行。</div>
+            </section>
+
+            <section class="artifact-section exception-section" :class="{ clear: !reviewWarnings.length && !state.task.errorMessage }">
+              <div class="artifact-heading"><div><span class="section-number">04</span><h3>异常与质量提示</h3></div><span class="record-count">{{ reviewWarnings.length + (state.task.errorMessage ? 1 : 0) }} ISSUES</span></div>
+              <ul v-if="reviewWarnings.length || state.task.errorMessage" class="exception-list"><li v-if="state.task.errorMessage">{{ state.task.errorMessage }}</li><li v-for="warning in reviewWarnings" :key="warning">{{ warning }}</li></ul>
+              <div v-else class="quality-pass"><span>✓</span><div><strong>未发现已记录的质量异常</strong><small>可继续人工复核或导出当前结果。</small></div></div>
+            </section>
+
             <section v-if="activeItem.id" class="artifact-section review-section">
-              <div class="artifact-heading"><div><span class="section-number">02</span><h3>人工复核</h3></div><span class="record-count">REVIEW</span></div>
+              <div class="artifact-heading"><div><span class="section-number">05</span><h3>人工复核</h3></div><span class="record-count">REVIEW</span></div>
               <form class="review-form" @submit.prevent="saveReview">
                 <label class="toggle-row"><input v-model="review.needHumanReview" type="checkbox" /><span class="toggle-ui"></span><span>标记为需要人工复核</span></label>
                 <div class="review-fields"><label><span>复核人</span><input v-model="review.reviewer" type="text" placeholder="姓名或工号" /></label><label><span>复核备注</span><textarea v-model="review.comment" rows="2" placeholder="记录材料或结果问题"></textarea></label></div>

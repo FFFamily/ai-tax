@@ -58,15 +58,22 @@ public class StorageService {
     }
 
     public String buildExecutionFileUrl(Long taskId, Long fileId, boolean publicUrl) {
+        return buildExecutionFileUrl(taskId, fileId, null, publicUrl);
+    }
+
+    public String buildExecutionFileUrl(Long taskId, Long fileId, String originalFileName, boolean publicUrl) {
         String baseUrl = publicUrl
                 ? properties.getStorage().getPublicBaseUrl()
                 : properties.getStorage().getInternalBaseUrl();
         if (!StringUtils.hasText(baseUrl)) {
             throw new IllegalStateException(publicUrl ? "未配置 APP_PUBLIC_BASE_URL" : "未配置 APP_INTERNAL_BASE_URL");
         }
-        return UriComponentsBuilder.fromUriString(baseUrl.replaceAll("/$", ""))
-                .pathSegment("execution-tasks", taskId.toString(), "files", fileId.toString())
-                .build()
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl.replaceAll("/$", ""))
+                .pathSegment("execution-tasks", taskId.toString(), "files", fileId.toString());
+        if (StringUtils.hasText(originalFileName)) {
+            builder.queryParam("fileName", originalFileName);
+        }
+        return builder.build()
                 .encode()
                 .toUriString();
     }

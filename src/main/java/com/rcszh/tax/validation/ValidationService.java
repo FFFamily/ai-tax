@@ -12,7 +12,7 @@ import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendExtractService;
 import com.rcszh.tax.route.DocumentRouteContext;
 import com.rcszh.tax.route.DocumentRouteResult;
-import com.rcszh.tax.route.DocumentRouter;
+import com.rcszh.tax.route.base.DocumentRouter;
 import com.rcszh.tax.server.DocumentServer;
 import jakarta.annotation.Resource;
 import org.springframework.core.io.ClassPathResource;
