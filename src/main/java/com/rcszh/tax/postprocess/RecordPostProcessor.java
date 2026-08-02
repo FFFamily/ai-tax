@@ -9,13 +9,13 @@ import com.rcszh.tax.workflow.DocumentWorkflow;
  *
  * <p>所有 Spring 容器中的实现类会由 {@link RecordPostProcessService} 自动收集，按
  * {@link #order()} 从小到大依次执行。处理器可读取解析结果、任务上下文和文档元数据，
- * 并直接修改 {@link AIParseResult} 中的 records、globalParam 或 warnings。</p>
+ * 并直接修改 {@link AIParseResult} 中的 records 或 warnings。</p>
  *
  * <p>实现约定：</p>
  * <ul>
- *     <li>{@link #supports(AIParseResult, DocumentTaskItem, DocumentWorkflow)} 只做低成本判断，避免执行耗时加工。</li>
- *     <li>{@link #process(AIParseResult, DocumentTaskItem, DocumentWorkflow)} 负责实际加工，异常由编排服务捕获并写入 warnings。</li>
- *     <li>处理器之间通过明确的 globalParam 键传递中间结果时，应通过 order 保证先后依赖。</li>
+ *     <li>{@link #supports(AIParseResult, DocumentTaskItem, DocumentWorkflow, RecordPostProcessContext)} 只做低成本判断。</li>
+ *     <li>{@link #process(AIParseResult, DocumentTaskItem, DocumentWorkflow, RecordPostProcessContext)} 负责实际加工。</li>
+ *     <li>处理器之间通过 {@link RecordPostProcessContext} 传递仅在本次调用有效的中间结果。</li>
  * </ul>
  */
 public interface RecordPostProcessor {
@@ -38,12 +38,16 @@ public interface RecordPostProcessor {
     /**
      * 判断当前上下文是否需要执行此处理器。
      *
-     * @param parseResult AI 解析结果，包含 records、globalParam 和 warnings
+     * @param parseResult AI 解析结果，包含 records 和 warnings
      * @param taskItem 当前文档任务项，包含路由结果和预处理流水等上下文
      * @param workflow 固定文档流程
-     * @return {@code true} 表示执行 {@link #process(AIParseResult, DocumentTaskItem, DocumentWorkflow)}
+     * @param context 本次后处理调用的临时上下文
+     * @return {@code true} 表示执行当前处理器
      */
-    boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow);
+    boolean supports(AIParseResult parseResult,
+                     DocumentTaskItem taskItem,
+                     DocumentWorkflow workflow,
+                     RecordPostProcessContext context);
 
     /**
      * 对解析记录执行二次加工，并将结果写回 {@code parseResult}。
@@ -51,6 +55,10 @@ public interface RecordPostProcessor {
      * @param parseResult 待加工的 AI 解析结果
      * @param taskItem 当前文档任务项
      * @param workflow 固定文档流程
+     * @param context 本次后处理调用的临时上下文
      */
-    void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow);
+    void process(AIParseResult parseResult,
+                 DocumentTaskItem taskItem,
+                 DocumentWorkflow workflow,
+                 RecordPostProcessContext context);
 }

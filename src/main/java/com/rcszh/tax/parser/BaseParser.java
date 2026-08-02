@@ -3,7 +3,6 @@ package com.rcszh.tax.parser;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
-import com.rcszh.tax.ir.ParsePreparationResult;
 import com.rcszh.tax.workflow.DocumentWorkflow;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 
@@ -26,45 +25,6 @@ public abstract class BaseParser {
      */
     public boolean requiresRemoteParse() {
         return false;
-    }
-
-    protected AIParseResult attachPreparation(AIParseResult parseResult, ParsePreparationResult preparation) {
-        if (parseResult == null || preparation == null) {
-            return parseResult;
-        }
-        // 将预处理阶段得到的结构化线索挂到 globalParam，供后处理、排错和人工复核复用。
-        parseResult.getGlobalParam().put("documentFeatures", preparation.getDocumentFeatures());
-        parseResult.getGlobalParam().put("transactionLineCount", preparation.getTransactionLines().size());
-        parseResult.getGlobalParam().put("transactionLineSample",
-                preparation.getTransactionLines().stream().limit(20).toList());
-        parseResult.getGlobalParam().put("tableCount", preparation.getHtmlTables().size());
-        return parseResult;
-    }
-
-    protected AIParseResult attachTaskMetadata(AIParseResult parseResult, DocumentTaskItem info) {
-        if (parseResult == null || info == null) {
-            return parseResult;
-        }
-        // 任务侧元数据统一回填到结果中，避免后续链路再次查询任务表做上下文拼装。
-        if (info.getWorkflowCode() != null) {
-            parseResult.getGlobalParam().put("workflowCode", info.getWorkflowCode());
-        }
-        if (info.getNeedHumanReview() != null) {
-            parseResult.getGlobalParam().put("needHumanReview", info.getNeedHumanReview());
-        }
-        if (info.getRouteSummary() != null) {
-            parseResult.getGlobalParam().put("routeSummary", info.getRouteSummary());
-        }
-        if (info.getRouteReason() != null) {
-            parseResult.getGlobalParam().put("routeReason", info.getRouteReason());
-        }
-        if (info.getRouteConfidence() != null) {
-            parseResult.getGlobalParam().put("routeConfidence", info.getRouteConfidence());
-        }
-        if (info.getRouteVariant() != null) {
-            parseResult.getGlobalParam().put("routeVariant", info.getRouteVariant());
-        }
-        return parseResult;
     }
 
     /**

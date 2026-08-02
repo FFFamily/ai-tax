@@ -40,10 +40,7 @@ const parsedResult = computed(() => {
     return {};
   }
 });
-const records = computed(() => {
-  const result = parsedResult.value;
-  return result.records?.length ? result.records : (result.globalParam?.dividendExtractRecords || []);
-});
+const records = computed(() => parsedResult.value.records || []);
 const routeSummary = computed(() => activeItem.value.route_summary || {});
 const statusClass = computed(() => ({
   COLLECTING: 'pending', PROCESSING: 'running', COMPLETED: 'success', FAILED: 'fail'
@@ -70,10 +67,20 @@ const reviewWarnings = computed(() => {
   const warnings = [];
   const append = (value) => {
     if (Array.isArray(value)) warnings.push(...value.filter(Boolean).map(String));
-    else if (value) warnings.push(String(value));
+    else if (typeof value === 'string' && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          append(parsed);
+          return;
+        }
+      } catch {
+        // Plain-text warnings are still accepted for older task records.
+      }
+      warnings.push(value);
+    } else if (value) warnings.push(String(value));
   };
   append(parsedResult.value.warnings);
-  append(parsedResult.value.globalParam?.reviewReasons);
   append(activeItem.value.review_reasons);
   records.value.forEach((record) => append(record.qualityWarnings || record.warnings));
   return [...new Set(warnings)];
@@ -233,9 +240,9 @@ async function loadTasks(quiet = false) {
 }
 
 function hydrateReview() {
-  review.needHumanReview = Boolean(activeItem.value.need_human_review || parsedResult.value.globalParam?.needHumanReview);
-  review.reviewer = parsedResult.value.globalParam?.reviewer || '';
-  review.comment = parsedResult.value.globalParam?.reviewComment || '';
+  review.needHumanReview = Boolean(activeItem.value.need_human_review);
+  review.reviewer = activeItem.value.reviewer || '';
+  review.comment = activeItem.value.review_comment || '';
   review.records = records.value.length ? JSON.stringify(records.value, null, 2) : '';
 }
 

@@ -3,10 +3,10 @@ package com.rcszh.tax.postprocess.dividend;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
+import com.rcszh.tax.postprocess.RecordPostProcessContext;
 import com.rcszh.tax.workflow.DocumentWorkflow;
 import org.springframework.stereotype.Component;
 
@@ -47,37 +47,39 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
      * @return 存在非空股息抽取记录列表时返回 {@code true}
      */
     @Override
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
-        Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
-        return records instanceof List<?> list && !list.isEmpty();
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem,
+                            DocumentWorkflow workflow, RecordPostProcessContext context) {
+        return context.isDividendRecordsPrepared()
+                && parseResult.getRecords() != null
+                && !parseResult.getRecords().isEmpty();
     }
 
     /**
      * 标准化并校验股息记录，汇总复核原因并回写任务状态。
      *
-     * @param parseResult 承载股息记录、告警和全局复核标志的解析结果
+     * @param parseResult 承载股息记录和告警的解析结果
      * @param taskItem 用于同步人工复核状态和路由信息的任务项
      * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
-        Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
-        if (!(records instanceof List<?> list) || list.isEmpty()) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem,
+                        DocumentWorkflow workflow, RecordPostProcessContext context) {
+        List<Map<String, Object>> records = parseResult.getRecords();
+        if (records == null || records.isEmpty()) {
             return;
         }
         // 质量校验负责把“可抽取”进一步提升为“可复核、可导出、可追责”的记录。
         // reviewed 保存标准化并附加逐条质检结果后的记录副本。
         List<Map<String, Object>> reviewed = new ArrayList<>();
-        // reviewReasons 汇总文档级复核原因，最终去重后同步到 parseResult 和 taskItem。
+        // reviewReasons 汇总文档级复核原因，最终去重后同步到 taskItem。
         List<String> reviewReasons = new ArrayList<>();
         // 文档级人工复核标志，只要任一记录或路由存在风险即置为 true。
         boolean needHumanReview = false;
         // duplicateGroups 保存确认重复的业务键，seenGroups 用于首次出现检测。
         Set<String> duplicateGroups = new HashSet<>();
         Set<String> seenGroups = new HashSet<>();
-        for (Object item : list) {
-            Map<String, Object> record = new LinkedHashMap<>((Map<String, Object>) item);
+        for (Map<String, Object> item : records) {
+            Map<String, Object> record = new LinkedHashMap<>(item);
             // 先做标准化，再校验字段一致性，避免格式差异把本来正确的记录误判为异常。
             normalize(record);
             String groupKey = buildDuplicateKey(record);
@@ -110,9 +112,7 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
                 }
             }
         }
-        parseResult.getGlobalParam().put(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS, reviewed);
         if (taskItem.getRouteSummary() != null) {
-            parseResult.getGlobalParam().put("routeSummary", taskItem.getRouteSummary());
             // 模板路由本身置信度过低时，即使字段看起来完整，也要提醒人工确认模板是否选对。
             BigDecimal routeConfidence = taskItem.getRouteSummary().getConfidence();
             if (routeConfidence != null && routeConfidence.compareTo(new BigDecimal("0.60")) < 0) {
@@ -123,9 +123,6 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
             }
         }
         List<String> finalReviewReasons = reviewReasons.stream().distinct().toList();
-        parseResult.getGlobalParam().put("dividendReviewReasons", finalReviewReasons);
-        parseResult.getGlobalParam().put("reviewReasons", finalReviewReasons);
-        parseResult.getGlobalParam().put("needHumanReview", needHumanReview);
         if (needHumanReview) {
             taskItem.setNeedHumanReview(true);
             taskItem.setReviewReasons(JSONUtil.toJsonStr(finalReviewReasons));
@@ -134,9 +131,7 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
             taskItem.setNeedHumanReview(false);
             taskItem.setReviewReasons(JSONUtil.toJsonStr(finalReviewReasons));
         }
-        if (parseResult.getRecords() != null && !parseResult.getRecords().isEmpty()) {
-            parseResult.setRecords(reviewed);
-        }
+        parseResult.setRecords(reviewed);
     }
 
     /**

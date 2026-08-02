@@ -1,9 +1,9 @@
 package com.rcszh.tax.postprocess.dividend;
 
-import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
+import com.rcszh.tax.postprocess.RecordPostProcessContext;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendExtractService;
@@ -17,8 +17,7 @@ import java.util.Map;
 /**
  * 股息处理链的专项抽取阶段。
  *
- * <p>读取候选召回阶段写入的 {@code globalParam[DIVIDEND_CANDIDATES]}，聚合为股息业务记录，
- * 再写入 {@code globalParam[DIVIDEND_EXTRACT_RECORDS]}。本处理器顺序为 60。</p>
+ * <p>读取临时上下文中的候选记录，聚合后直接写入最终 records。本处理器顺序为 60。</p>
  */
 @Component
 public class DividendExtractPostProcessor implements RecordPostProcessor {
@@ -47,97 +46,38 @@ public class DividendExtractPostProcessor implements RecordPostProcessor {
      * @return 存在候选且文档类型包含股息提示时返回 {@code true}
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
-        Object candidates = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
-        if (!(candidates instanceof List<?> list) || list.isEmpty()) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem,
+                            DocumentWorkflow workflow, RecordPostProcessContext context) {
+        if (context.getDividendCandidates().isEmpty()) {
             return false;
         }
         return workflow != null && workflow.supports("DIVIDEND");
     }
 
     /**
-     * 将候选 Map 还原为领域对象并执行专项抽取。
+     * 对候选记录执行专项抽取，并将结果写入最终 records。
      *
-     * <p>抽取结果始终写入 globalParam；仅当原始 records 为空时才直接回填 records，
-     * 避免提前覆盖其他解析结果。</p>
-     *
-     * @param parseResult 承载候选数据和抽取结果的解析结果
+     * @param parseResult 承载最终抽取结果的解析结果
      * @param taskItem 当前文档任务项
      * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
-        Object candidateObject = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
-        if (!(candidateObject instanceof List<?> candidateMaps) || candidateMaps.isEmpty()) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem,
+                        DocumentWorkflow workflow, RecordPostProcessContext context) {
+        List<DividendCandidateRecord> candidates = context.getDividendCandidates();
+        if (candidates.isEmpty()) {
             return;
         }
-        // globalParam 使用 Map 传递数据，此处恢复为强类型对象供领域服务处理。
-        List<DividendCandidateRecord> candidates = candidateMaps.stream()
-                .map(this::toCandidateRecord)
-                .toList();
         List<DividendExtractRecord> extracted = dividendExtractService.extract(candidates);
         if (extracted.isEmpty()) {
             return;
         }
-        // 重新转成 Map，保持 AIParseResult 的通用数据结构契约。
         List<Map<String, Object>> extractedMaps = extracted.stream()
                 .map(DividendExtractRecord::toMap)
                 .toList();
-        parseResult.getGlobalParam().put(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS, extractedMaps);
-        parseResult.getGlobalParam().put("dividendExtractCount", extractedMaps.size());
-        if (parseResult.getRecords() == null || parseResult.getRecords().isEmpty()) {
-            parseResult.setRecords(extractedMaps);
-        }
+        parseResult.setRecords(extractedMaps);
+        context.setDividendRecordsPrepared(true);
         parseResult.getWarnings().add("已生成股息专项记录 " + extractedMaps.size() + " 条。");
-    }
-
-    /**
-     * 将 globalParam 中的通用对象转换为股息候选记录。
-     *
-     * @param source 已是 {@link DividendCandidateRecord} 的对象或候选字段 Map
-     * @return 可供抽取服务使用的强类型候选记录
-     */
-    @SuppressWarnings("unchecked")
-    private DividendCandidateRecord toCandidateRecord(Object source) {
-        if (source instanceof DividendCandidateRecord record) {
-            return record;
-        }
-        Map<String, Object> map = (Map<String, Object>) source;
-        DividendCandidateRecord record = new DividendCandidateRecord();
-        record.setRowId((String) map.get("rowId"));
-        record.setDividendDate((String) map.get("dividendDate"));
-        record.setPayer((String) map.get("payer"));
-        record.setSummary((String) map.get("summary"));
-        record.setCurrency((String) map.get("currency"));
-        record.setDirection((String) map.get("direction"));
-        Object amount = map.get("amount");
-        if (amount != null) {
-            record.setAmount(new java.math.BigDecimal(amount.toString()));
-        }
-        Object balance = map.get("balance");
-        if (balance != null) {
-            record.setBalance(new java.math.BigDecimal(balance.toString()));
-        }
-        Object confidence = map.get("confidence");
-        if (confidence != null) {
-            record.setConfidence(new java.math.BigDecimal(confidence.toString()));
-        }
-        record.setCategory((String) map.get("category"));
-        Object reasons = map.get("reasons");
-        if (reasons instanceof List<?> list) {
-            record.setReasons(list.stream().map(String::valueOf).toList());
-        }
-        Object evidence = map.get("evidence");
-        if (evidence instanceof Map<?, ?> evidenceMap) {
-            record.getEvidence().putAll((Map<String, Object>) evidenceMap);
-        }
-        Object rawData = map.get("rawData");
-        if (rawData instanceof Map<?, ?> rawMap) {
-            record.getRawData().putAll((Map<String, Object>) rawMap);
-        }
-        return record;
     }
 
 }

@@ -7,10 +7,8 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.rcszh.tax.common.ApiResponse;
-import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.dto.DetailRecord;
 import com.rcszh.tax.dto.DetailRecordImport;
-import com.rcszh.tax.dto.ExportDataDTO;
 import com.rcszh.tax.dto.ExportRequestDTO;
 import com.rcszh.tax.entity.task.DocumentTask;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
@@ -83,11 +81,7 @@ public class ExportController {
                 continue;
             }
             try {
-                ExportDataDTO exportData = JSONUtil.toBean(jsonData, ExportDataDTO.class);
-                List<DetailRecord> records = exportData == null ? null : exportData.getRecords();
-                if (records == null || records.isEmpty()) {
-                    records = loadDividendRecords(jsonData);
-                }
+                List<DetailRecord> records = loadRecords(jsonData);
                 if (records == null || records.isEmpty()) {
                     return ApiResponse.error("没有可导出的数据");
                 }
@@ -125,14 +119,10 @@ public class ExportController {
         return ApiResponse.error("没有可导出的数据");
     }
 
-    private List<DetailRecord> loadDividendRecords(String jsonData) {
+    private List<DetailRecord> loadRecords(String jsonData) {
         JSONObject root = JSONUtil.parseObj(jsonData);
-        JSONObject globalParam = root.getJSONObject("globalParam");
-        if (globalParam == null) {
-            return List.of();
-        }
-        Object dividendRecords = globalParam.get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
-        if (!(dividendRecords instanceof List<?> list) || list.isEmpty()) {
+        Object recordValue = root.get("records");
+        if (!(recordValue instanceof List<?> list) || list.isEmpty()) {
             return List.of();
         }
         List<DetailRecord> records = new ArrayList<>();
@@ -140,7 +130,12 @@ public class ExportController {
             if (!(item instanceof Map<?, ?> map)) {
                 continue;
             }
-            records.add(toDetailRecord((Map<String, Object>) map));
+            Map<String, Object> recordMap = (Map<String, Object>) map;
+            if (recordMap.containsKey("payer") || recordMap.containsKey("dividendDate")) {
+                records.add(toDetailRecord(recordMap));
+            } else {
+                records.add(JSONUtil.toBean(JSONUtil.parseObj(recordMap), DetailRecord.class));
+            }
         }
         return records;
     }

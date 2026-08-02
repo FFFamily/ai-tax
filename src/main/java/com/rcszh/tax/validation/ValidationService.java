@@ -1,15 +1,12 @@
 package com.rcszh.tax.validation;
 
 import cn.hutool.json.JSONUtil;
-import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendCandidateService;
-import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
-import com.rcszh.tax.postprocess.dividend.service.DividendExtractService;
 import com.rcszh.tax.workflow.DocumentWorkflow;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
@@ -30,8 +27,6 @@ public class ValidationService {
     private DocumentWorkflowRegistry workflowRegistry;
     @Resource
     private DividendCandidateService dividendCandidateService;
-    @Resource
-    private DividendExtractService dividendExtractService;
     @Resource
     private RecordPostProcessService recordPostProcessService;
 
@@ -63,14 +58,7 @@ public class ValidationService {
         List<DividendCandidateRecord> candidates = dividendCandidateService.collectCandidates(sampleCase.getTransactionLines());
         report.setDividendCandidateCount(candidates.size());
 
-        List<DividendExtractRecord> extracted = dividendExtractService.extract(candidates);
         AIParseResult parseResult = new AIParseResult();
-        parseResult.getGlobalParam().put("routeSummary", routeSummary);
-        parseResult.getGlobalParam().put(ResultBaseFieldConstant.DIVIDEND_CANDIDATES,
-                candidates.stream().map(DividendCandidateRecord::toMap).toList());
-        parseResult.getGlobalParam().put(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS,
-                extracted.stream().map(DividendExtractRecord::toMap).toList());
-        parseResult.setRecords(extracted.stream().map(DividendExtractRecord::toMap).toList());
 
         DocumentTaskItem taskItem = new DocumentTaskItem();
         taskItem.setWorkflowCode(sampleCase.getWorkflowCode());
@@ -78,11 +66,11 @@ public class ValidationService {
         taskItem.setRouteReason("[fixed] 使用代码内固定流程: " + workflow.code());
         taskItem.setNeedHumanReview(false);
         taskItem.setRouteSummary(toRouteSummary(workflow));
+        taskItem.setPreparedTransactionLines(sampleCase.getTransactionLines());
         recordPostProcessService.postProcess(parseResult, taskItem, workflow);
 
-        Object finalRecords = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
-        report.setDividendExtractCount(finalRecords instanceof List<?> list ? list.size() : 0);
-        report.setNeedHumanReview(Boolean.TRUE.equals(parseResult.getGlobalParam().get("needHumanReview")));
+        report.setDividendExtractCount(parseResult.getRecords().size());
+        report.setNeedHumanReview(Boolean.TRUE.equals(taskItem.getNeedHumanReview()));
         collectIssues(sampleCase, workflow, report);
         return report;
     }

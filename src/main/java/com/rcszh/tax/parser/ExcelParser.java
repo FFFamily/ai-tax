@@ -48,7 +48,6 @@ public class ExcelParser extends BaseParser{
         info.setPreparedTransactionLines(preparation.getTransactionLines());
         info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
         String prompt = workflow.buildPrompt();
-        AIParseResult aiParseResult = deepSeekAi.chat(results, prompt, null, workflow);
-        return attachTaskMetadata(attachPreparation(aiParseResult, preparation), info);
+        return deepSeekAi.chat(results, prompt, null, workflow);
     }
 }

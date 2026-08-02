@@ -76,7 +76,7 @@ public abstract class AiManage {
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             AIParseResult result = new AIParseResult();
             log.info("开始执行异步 CompletableFuture 任务");
-            // 多分片并发调用模型，再将 records / warnings / globalParam 汇总为统一结果。
+            // 多分片并发调用模型，再将记录和问题信息汇总为统一结果。
             List<CompletableFuture<AIParseResult>> futureTaskList =
                     taskList.stream()
                             .map(data -> CompletableFuture.supplyAsync(() -> sendMsg(agent, agentCall, data), executor))
@@ -84,7 +84,6 @@ public abstract class AiManage {
             CompletableFuture<Void> allDone = CompletableFuture.allOf(futureTaskList.toArray(new CompletableFuture[0]));
             allDone.join();
             futureTaskList.stream().map(CompletableFuture::join).forEach(item -> {
-                result.getGlobalParam().putAll(item.getGlobalParam());
                 result.getErrors().addAll(item.getErrors());
                 result.getRecords().addAll(item.getRecords());
                 result.getErrorRecords().addAll(item.getErrorRecords());

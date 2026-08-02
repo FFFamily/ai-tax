@@ -4,13 +4,9 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.entity.AIParseResult;
-import com.rcszh.tax.entity.ChatLog;
-import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +37,6 @@ public class AIDocumentParseServer {
                 3. 数据转换：一旦识别到表格复合条件，需要将表格中的数据转化成 record 对象
                 5. 处理多语言：支持中文、英文、繁体中文等多种语言
                 6. 错误处理：识别并处理可能的解析错误，如表格结构不匹配、数据缺失等，将数据存入到errorRecords中，根据用户指定的数据结构进行返回，没有指定则不需要返回errorRecords。
-                7. 全局参数：若有特别声明全局参数的提取语句时，将全局参数提取并存入到 globalParam 中
                 """);
         // 输出格式要求
         prompt.append("## 输出格式要求\n");
@@ -62,8 +57,7 @@ public class AIDocumentParseServer {
                 {
                   "warnings": ["表格1的表头格式不标准，可能存在解析错误"],
                   "records": [],
-                  "errorRecords":[],
-                  "globalParam":{},
+                  "errorRecords":[]
                 }
                 """);
         return prompt.toString();
@@ -106,10 +100,6 @@ public class AIDocumentParseServer {
             JSONArray errors = json.getJSONArray("errors");
             if (errors != null) {
                 result.setErrors(errors.toList(String.class));
-            }
-            JSONObject globalParam = json.getJSONObject("globalParam");
-            if (globalParam != null) {
-                result.setGlobalParam(globalParam);
             }
             return result;
         } catch (Exception e) {

@@ -5,6 +5,7 @@ import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
+import com.rcszh.tax.postprocess.RecordPostProcessContext;
 import com.rcszh.tax.postprocess.RecordValueUtil;
 import com.rcszh.tax.postprocess.stock.model.StockCapitalTransferRecord;
 import com.rcszh.tax.postprocess.stock.model.StockDividendRecord;
@@ -66,7 +67,8 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      * @return 证券日结单或股票交易明细流程返回 {@code true}
      */
     @Override
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem,
+                            DocumentWorkflow workflow, RecordPostProcessContext context) {
         if (workflow == null) {
             return false;
         }
@@ -86,7 +88,8 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem,
+                        DocumentWorkflow workflow, RecordPostProcessContext context) {
         // 将股票相关流水从 records 中抽出来加工；其他类型记录原样保留，方便后续扩展更多 processor
         /** 预留的股票原始流水集合，用于后续恢复股票与其他记录分流。 */
         List<Map<String, Object>> stockRaw = new ArrayList<>();

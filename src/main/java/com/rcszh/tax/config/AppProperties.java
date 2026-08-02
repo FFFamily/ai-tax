@@ -1,6 +1,7 @@
 package com.rcszh.tax.config;
 
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
@@ -19,7 +20,7 @@ public class AppProperties {
 
     @Data
     public static class Ai {
-        private String deepseekApiKey = "sk-9463061a14864d99854fc8f5698e539b";
+        private String deepseekApiKey = "";
         private String deepseekBaseUrl = "https://api.deepseek.com";
         private String deepseekModel = "deepseek-v4-flash";
         private final Rag rag = new Rag();
@@ -51,6 +52,6 @@ public class AppProperties {
         private long maxWaitMillis = 600000;
         private int requestTimeoutSeconds = 60;
         private int uploadTimeoutSeconds = 600;
-        private String token = "sk-gr3jQ0XI9PgGksxOaJWOY3YvFCdrcGibjXHPt1APSltRlk3m";
+        private String token = "";
     }
 }

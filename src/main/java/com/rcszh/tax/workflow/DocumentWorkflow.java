@@ -21,7 +21,6 @@ public record DocumentWorkflow(
         String pageType,
         int pageStep,
         String prompt,
-        String globalPrompt,
         String errorRecord,
         List<DocumentOutputField> outputFields) {
 
@@ -30,7 +29,6 @@ public record DocumentWorkflow(
         pageType = pageType == null || pageType.isBlank() ? DocumentPageTypeEnum.DATA.getCode() : pageType;
         pageStep = pageStep <= 0 ? 20 : pageStep;
         prompt = prompt == null ? "" : prompt;
-        globalPrompt = globalPrompt == null ? "" : globalPrompt;
         errorRecord = errorRecord == null ? "" : errorRecord;
         capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
         outputFields = outputFields == null ? List.of() : List.copyOf(outputFields);
@@ -41,9 +39,6 @@ public record DocumentWorkflow(
      */
     public String buildPrompt() {
         StringBuilder result = new StringBuilder();
-        if (!globalPrompt.isBlank()) {
-            result.append("全局参数（globalParam）提取规则如下：\n").append(globalPrompt).append('\n');
-        }
         if (!errorRecord.isBlank()) {
             result.append("解析失败数据结构（errorRecords）规则如下：\n").append(errorRecord).append('\n');
         }

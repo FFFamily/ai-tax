@@ -2,7 +2,6 @@ package com.rcszh.tax.service;
 
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.dto.TaskItemReviewRequest;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.server.DocumentTaskServer;
@@ -34,13 +33,6 @@ public class TaskReviewService {
         List<String> reviewReasons = request.getReviewReasons() == null
                 ? new ArrayList<>()
                 : new ArrayList<>(request.getReviewReasons());
-        if (request.getComment() != null && !request.getComment().isBlank()) {
-            reviewReasons.add("reviewComment:" + request.getComment().trim());
-        }
-        if (request.getReviewer() != null && !request.getReviewer().isBlank()) {
-            reviewReasons.add("reviewer:" + request.getReviewer().trim());
-        }
-
         List<String> distinctReviewReasons = reviewReasons.stream().distinct().toList();
         item.setNeedHumanReview(needHumanReview);
         item.setReviewReasons(JSONUtil.toJsonStr(distinctReviewReasons));
@@ -49,11 +41,8 @@ public class TaskReviewService {
         JSONObject root = changeResult == null || changeResult.isBlank()
                 ? new JSONObject()
                 : JSONUtil.parseObj(changeResult);
-        JSONObject globalParam = root.getJSONObject("globalParam");
-        if (globalParam == null) {
-            globalParam = new JSONObject();
-            root.set("globalParam", globalParam);
-        }
+        // 复核旧任务时顺带移除历史结果中的废弃字段。
+        root.remove("globalParam");
 
         // 若复核端提交了修正记录，以人工版本覆盖 AI 产物，保证导出和后续查询都读取同一份结果。
         List<Map<String, Object>> reviewedRecords = request.getRecords() == null
@@ -63,23 +52,12 @@ public class TaskReviewService {
                 .toList();
         if (!reviewedRecords.isEmpty()) {
             root.set("records", reviewedRecords);
-            globalParam.set(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS, reviewedRecords);
-            globalParam.set("dividendExtractCount", reviewedRecords.size());
-        }
-        globalParam.set("needHumanReview", needHumanReview);
-        globalParam.set("reviewReasons", distinctReviewReasons);
-        globalParam.set("dividendReviewReasons", distinctReviewReasons);
-        if (request.getReviewer() != null && !request.getReviewer().isBlank()) {
-            globalParam.set("reviewer", request.getReviewer().trim());
-        }
-        if (request.getComment() != null && !request.getComment().isBlank()) {
-            globalParam.set("reviewComment", request.getComment().trim());
         }
         item.setChangeResult(root.toString());
         documentTaskServer.updateTaskItem(item);
         DocumentTaskItem updated = documentTaskServer.getTaskItemById(itemId);
-        // 复核完成后立即沉淀学习样本，为后续模板路由和 AI few-shot 提供反馈数据。
+        // 复核完成后立即沉淀审计记录，保留人工修正前后的可追溯信息。
         reviewLearningService.saveLearningFromReview(updated, reviewedRecords, request.getReviewer(), request.getComment());
-        return updated;
+        return documentTaskServer.getTaskItemById(itemId);
     }
 }

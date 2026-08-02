@@ -165,7 +165,6 @@ public class DocumentWorkflowRegistry {
                 DocumentPageTypeEnum.DATA.getCode(),
                 20,
                 prompt,
-                "提取文档级主体、期间、账号和币种；没有明确依据的参数不要生成。",
                 COMMON_ERROR_RULE,
                 fields
         );

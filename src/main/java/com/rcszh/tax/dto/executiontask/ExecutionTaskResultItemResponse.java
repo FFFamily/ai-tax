@@ -63,6 +63,13 @@ public class ExecutionTaskResultItemResponse {
     @JsonProperty("review_reasons")
     private String reviewReasons;
 
+    /** 最近一次人工复核人。 */
+    private String reviewer;
+
+    /** 最近一次人工复核意见。 */
+    @JsonProperty("review_comment")
+    private String reviewComment;
+
     /** 文档路由摘要。 */
     @JsonProperty("route_summary")
     private ExecutionTaskRouteSummaryResponse routeSummary;

@@ -44,7 +44,7 @@ public class DividendCandidateRecord {
     private Map<String, Object> rawData = new LinkedHashMap<>();
 
     /**
-     * 转换为可写入 {@code AIParseResult.globalParam} 的通用 Map。
+     * 转换为通用 Map，供日志和诊断输出使用。
      *
      * @return 按固定字段顺序生成的候选记录 Map
      */

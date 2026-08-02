@@ -54,6 +54,11 @@ public class DocumentTaskItem {
     @JsonProperty("review_reasons")
     private String reviewReasons;
 
+    private String reviewer;
+
+    @JsonProperty("review_comment")
+    private String reviewComment;
+
     @JsonProperty("route_summary")
     private ExecutionTaskRouteSummaryResponse routeSummary;
 

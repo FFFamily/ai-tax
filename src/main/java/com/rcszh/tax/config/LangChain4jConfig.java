@@ -1,6 +1,5 @@
-package com.rcszh.tax.ai;
+package com.rcszh.tax.config;
 
-import com.rcszh.tax.config.AppProperties;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;

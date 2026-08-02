@@ -168,6 +168,7 @@ public class DocumentTaskServer {
         result.setTableResult(item.getTableResult());
         result.setReviewReasons(item.getReviewReasons());
         result.setRouteSummary(buildRouteSummary(item));
+        applyLatestReview(result, latestReview(item.getId()));
         return result;
     }
 
@@ -207,7 +208,34 @@ public class DocumentTaskServer {
         result.setTableResult(item.getTableResult());
         result.setReviewReasons(item.getReviewReasons());
         result.setRouteSummary(buildRouteSummary(item));
+        applyLatestReview(result, latestReview(item.getId()));
         return result;
+    }
+
+    private ReviewLearning latestReview(Long taskItemId) {
+        if (taskItemId == null) {
+            return null;
+        }
+        return reviewLearningMapper.selectOne(new LambdaQueryWrapper<ReviewLearning>()
+                .eq(ReviewLearning::getTaskItemId, taskItemId)
+                .orderByDesc(ReviewLearning::getId)
+                .last("LIMIT 1"));
+    }
+
+    private void applyLatestReview(DocumentTaskItem item, ReviewLearning review) {
+        if (review == null) {
+            return;
+        }
+        item.setReviewer(review.getReviewer());
+        item.setReviewComment(review.getComment());
+    }
+
+    private void applyLatestReview(ExecutionTaskResultItemResponse item, ReviewLearning review) {
+        if (review == null) {
+            return;
+        }
+        item.setReviewer(review.getReviewer());
+        item.setReviewComment(review.getComment());
     }
 
     private ExecutionTaskRouteSummaryResponse buildRouteSummary(TaxTaskItem item) {

@@ -76,8 +76,7 @@ public class PDFParser extends BaseParser{
                      如果匹配程度高于90%，可以手动改变表格结构并存入records数组中，同时也要在errorRecords数组中补充上不匹配原因
                      不能丢弃任何一个数据，如果不匹配，直接将原格式数据补充在errorRecords数组中并附带上不匹配原因
                     """;
-            AIParseResult aiParseResult = deepSeekAi.chat(parseResults, prompt, agentCall, workflow);
-            return attachTaskMetadata(attachPreparation(aiParseResult, preparation), info);
+            return deepSeekAi.chat(parseResults, prompt, agentCall, workflow);
         }
         return null;
     }
