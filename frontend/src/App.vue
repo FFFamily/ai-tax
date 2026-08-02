@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 const API_PREFIX = import.meta.env.DEV ? '/api' : '';
 const selectedTaskKey = 'taxroom.executionTaskId';
@@ -15,11 +15,18 @@ const state = reactive({
   noticeType: '',
   backendOnline: false,
   showCreate: false,
+  showTaskEntry: false,
+  showRerunConfirm: false,
+  createMode: '',
   selectedIncomeType: '',
   activeItemIndex: 0,
-  uploadingMaterial: ''
+  uploadingMaterial: '',
+  chatLoading: false
 });
 const review = reactive({ needHumanReview: false, reviewer: '', comment: '', records: '' });
+const chatDraft = ref('');
+const chatStreamRef = ref(null);
+const chatMessages = ref([]);
 let pollingTimer;
 
 const activeItem = computed(() => state.result?.items?.[state.activeItemIndex] || {});
@@ -45,7 +52,7 @@ const canSubmit = computed(() => state.task?.status === 'COLLECTING'
   && state.task.fileCount > 0
   && !state.loading
   && !state.uploadingMaterial);
-const canRetry = computed(() => state.task?.status === 'FAILED' && !state.loading);
+const canRerun = computed(() => ['FAILED', 'COMPLETED'].includes(state.task?.status) && !state.loading);
 const resultLabel = computed(() => records.value.length
   ? `${records.value.length} 条记录`
   : (state.task?.status === 'COMPLETED' ? '无结构化记录' : '等待处理结果'));
@@ -101,6 +108,83 @@ function notify(message, type = '') {
   window.setTimeout(() => {
     if (state.notice === message) state.notice = '';
   }, 5000);
+}
+
+function initialChatMessages() {
+  return [{
+    role: 'assistant',
+    content: '你可以先说说这笔收入是怎么产生的、由谁支付。我会通过简单追问帮你判断可能的境外所得类型。',
+    createdAt: new Date().toISOString()
+  }];
+}
+
+function openTaskEntry() {
+  state.showTaskEntry = true;
+}
+
+function closeTaskEntry() {
+  state.showTaskEntry = false;
+}
+
+function openRerunConfirm() {
+  if (!canRerun.value) return;
+  state.showRerunConfirm = true;
+}
+
+function closeRerunConfirm() {
+  if (!state.loading) state.showRerunConfirm = false;
+}
+
+function chooseCreateMode(mode) {
+  state.createMode = mode;
+  state.showCreate = true;
+  state.showTaskEntry = false;
+  if (mode === 'chat') {
+    chatMessages.value = initialChatMessages();
+    chatDraft.value = '';
+    nextTick(scrollChatToBottom);
+  }
+}
+
+function scrollChatToBottom() {
+  if (chatStreamRef.value) chatStreamRef.value.scrollTop = chatStreamRef.value.scrollHeight;
+}
+
+async function sendChat() {
+  const message = chatDraft.value.trim();
+  if (!message || state.chatLoading) return;
+  const history = chatMessages.value
+    .filter((item) => !item.error)
+    .slice(-20)
+    .map(({ role, content }) => ({ role, content }));
+  chatMessages.value.push({ role: 'user', content: message, createdAt: new Date().toISOString() });
+  chatDraft.value = '';
+  state.chatLoading = true;
+  await nextTick();
+  scrollChatToBottom();
+  try {
+    const response = await request('/ai/chat/query', {
+      method: 'POST',
+      body: JSON.stringify({ message, history })
+    });
+    chatMessages.value.push({
+      role: 'assistant',
+      content: String(response || '我暂时没有获取到有效回复，请换一种方式描述这笔收入。'),
+      createdAt: new Date().toISOString()
+    });
+  } catch (error) {
+    chatMessages.value.push({
+      role: 'assistant',
+      content: '对话服务暂时不可用，请稍后重试。',
+      createdAt: new Date().toISOString(),
+      error: true
+    });
+    notify(error.message, 'error');
+  } finally {
+    state.chatLoading = false;
+    await nextTick();
+    scrollChatToBottom();
+  }
 }
 
 function trimId(value) { return String(value || '').slice(0, 10); }
@@ -174,6 +258,9 @@ async function loadTask(taskId, quiet = false) {
   state.taskId = String(taskId);
   localStorage.setItem(selectedTaskKey, state.taskId);
   state.showCreate = false;
+  state.showTaskEntry = false;
+  state.showRerunConfirm = false;
+  state.createMode = '';
   if (!quiet) state.loading = true;
   try {
     state.task = await request(`/execution-tasks/${encodeURIComponent(taskId)}`);
@@ -268,18 +355,30 @@ async function submitTask() {
   }
 }
 
-async function retryTask() {
-  if (!canRetry.value) return;
+async function rerunTask() {
+  if (!canRerun.value) return;
+  let rerunAccepted = false;
   state.loading = true;
+  state.result = null;
+  state.activeItemIndex = 0;
+  review.needHumanReview = false;
+  review.reviewer = '';
+  review.comment = '';
+  review.records = '';
   try {
     state.task = await request(`/execution-tasks/${encodeURIComponent(state.task.id)}/retry`, { method: 'POST' });
-    state.result = null;
-    state.activeItemIndex = 0;
-    await Promise.all([loadTasks(true), loadResult(true)]);
+    rerunAccepted = true;
+    state.showRerunConfirm = false;
     startPolling();
-    notify('任务已重新提交', 'success');
+    await Promise.all([loadTasks(true), loadResult(true)]);
+    notify('旧结果已清理，任务已重新提交', 'success');
   } catch (error) {
-    notify(error.message, 'error');
+    if (rerunAccepted) {
+      notify(`任务已重新提交，但列表刷新失败：${error.message}`, 'error');
+    } else {
+      await loadResult(true);
+      notify(error.message, 'error');
+    }
   } finally {
     state.loading = false;
   }
@@ -334,7 +433,10 @@ async function initialize() {
     await Promise.all([loadOptions(), loadTasks()]);
     state.backendOnline = true;
     if (state.taskId) await loadTask(state.taskId);
-    else state.showCreate = true;
+    else {
+      state.showCreate = true;
+      state.showTaskEntry = true;
+    }
   } catch (error) {
     state.backendOnline = false;
     notify(error.message, 'error');
@@ -367,7 +469,7 @@ onBeforeUnmount(stopPolling);
       <aside class="session-rail">
         <div class="rail-heading">
           <div><span class="section-kicker">TASKS</span><h2>任务记录</h2></div>
-          <button class="icon-button" type="button" title="新建任务" aria-label="新建任务" @click="state.showCreate = true">+</button>
+          <button class="icon-button" type="button" title="新建任务" aria-label="新建任务" @click="openTaskEntry">+</button>
         </div>
         <div class="recent-list">
           <div v-if="!state.tasks.length && !state.listLoading" class="rail-empty"><span class="empty-glyph">+</span><strong>暂无任务</strong><small>创建第一项境外所得执行任务</small></div>
@@ -382,11 +484,11 @@ onBeforeUnmount(stopPolling);
 
       <section class="conversation-panel">
         <header class="conversation-header">
-          <div class="agent-identity"><span class="agent-avatar">T</span><div><h1>税务材料助手</h1><p>{{ state.task?.incomeTypeLabel || '创建境外所得任务' }}</p></div></div>
-          <span class="agent-state"><i></i>{{ state.task?.statusLabel || '在线' }}</span>
+          <div class="agent-identity"><span class="agent-avatar">T</span><div><h1>税务材料助手</h1><p>{{ state.createMode === 'chat' ? '协助识别所得类型' : (state.task?.incomeTypeLabel || '创建境外所得任务') }}</p></div></div>
+          <span class="agent-state"><i></i>{{ state.chatLoading ? '思考中' : (state.task?.statusLabel || '在线') }}</span>
         </header>
 
-        <div v-if="state.showCreate || !state.task" class="creation-view">
+        <div v-if="(state.showCreate || !state.task) && state.createMode === 'known'" class="creation-view">
           <div class="creation-heading"><span class="section-kicker">INTENT</span><h2>这次要处理哪类所得？</h2><p>选择所得类型后，Agent 会建立任务并在右侧工作台生成材料与数据区。</p></div>
           <div class="income-options">
             <label v-for="(option, index) in state.options" :key="option.code" class="income-option" :class="{ selected: state.selectedIncomeType === option.code }">
@@ -397,6 +499,30 @@ onBeforeUnmount(stopPolling);
             </label>
           </div>
           <button class="primary-command" type="button" :disabled="state.loading || !state.selectedIncomeType" @click="createTask">创建任务 <span>→</span></button>
+        </div>
+
+        <section v-else-if="(state.showCreate || !state.task) && state.createMode === 'chat'" class="chat-setup-view">
+          <header class="chat-setup-header">
+            <div><span class="section-kicker">AI DIALOGUE</span><h2>一起确认所得类型</h2><p>描述收入的来源和产生方式，Agent 会继续追问。</p></div>
+            <button class="text-command" type="button" @click="openTaskEntry">重新选择</button>
+          </header>
+          <div ref="chatStreamRef" class="chat-message-list" aria-live="polite">
+            <article v-for="(message, index) in chatMessages" :key="`${message.createdAt}-${index}`" class="chat-message" :class="[message.role, { error: message.error }]">
+              <span v-if="message.role === 'assistant'" class="message-avatar">T</span>
+              <div class="chat-bubble"><div class="message-meta"><strong>{{ message.role === 'assistant' ? 'Tax Agent' : '你' }}</strong><span>{{ formatDate(message.createdAt) }}</span></div><p>{{ message.content }}</p></div>
+            </article>
+            <article v-if="state.chatLoading" class="chat-message assistant loading-message"><span class="message-avatar">T</span><div class="chat-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span><small>正在整理问题</small></div></article>
+          </div>
+          <form class="chat-composer" @submit.prevent="sendChat">
+            <label class="visually-hidden" for="chat-message">描述这笔境外收入</label>
+            <textarea id="chat-message" v-model="chatDraft" rows="2" maxlength="2000" :disabled="state.chatLoading" placeholder="例如：我持有一家境外公司的股票，今年收到一笔分红…" @keydown.enter.exact.prevent="sendChat"></textarea>
+            <button class="chat-send-button" type="submit" title="发送消息" aria-label="发送消息" :disabled="state.chatLoading || !chatDraft.trim()">↑</button>
+            <small>Shift + Enter 换行</small>
+          </form>
+        </section>
+
+        <div v-else-if="state.showCreate || !state.task" class="creation-pending">
+          <span class="pending-mark">?</span><h2>如何开始这次任务？</h2><p>请先选择是否已经知道所得类型。</p><button class="primary-command" type="button" @click="openTaskEntry">选择开始方式 <span>→</span></button>
         </div>
 
         <div v-else class="conversation-stream">
@@ -451,13 +577,14 @@ onBeforeUnmount(stopPolling);
           <div><span class="section-kicker">DATA WORKSPACE</span><h2>{{ state.task ? '文件与数据工作台' : '处理结果' }}</h2></div>
           <div v-if="state.task" class="task-actions">
             <button class="icon-text-button" type="button" title="刷新任务" aria-label="刷新任务" @click="refreshCurrent()">↻ <span>刷新</span></button>
+            <button v-if="state.task.status === 'COMPLETED'" class="rerun-command" type="button" :disabled="!canRerun" title="重新执行任务" @click="openRerunConfirm">↻ <span>重新执行</span></button>
             <button class="export-button" type="button" :disabled="state.task.status !== 'COMPLETED'" @click="exportTask">↓ <span>导出 Excel</span></button>
           </div>
         </header>
 
         <div v-if="!state.task || state.showCreate" class="workspace-empty">
           <div class="document-placeholder"><span class="document-corner"></span><b>DATA</b><i></i><i></i><i></i><small>TAX WORKSPACE</small></div>
-          <h3>等待任务</h3><p>完成左侧意图选择后，文件、结构化记录、证据行、异常与导出结果将集中在这里。</p>
+          <h3>{{ state.createMode === 'chat' ? '正在确认所得类型' : '等待任务' }}</h3><p>{{ state.createMode === 'chat' ? '完成对话后，可再回到所得类型选择流程。' : '完成左侧意图选择后，文件、结构化记录、证据行、异常与导出结果将集中在这里。' }}</p>
           <div class="empty-process"><span><b>01</b> 文件</span><span><b>02</b> 结构化记录</span><span><b>03</b> 证据与异常</span><span><b>04</b> 复核导出</span></div>
         </div>
 
@@ -506,7 +633,7 @@ onBeforeUnmount(stopPolling);
           <template v-if="state.task.status !== 'COLLECTING'">
             <section v-if="state.task.errorMessage" class="processing-error">
               <div><span>处理失败</span><p>{{ state.task.errorMessage }}</p></div>
-              <button v-if="state.task.status === 'FAILED'" class="retry-command" type="button" :disabled="!canRetry" @click="retryTask">↻ <span>{{ state.loading ? '提交中' : '重新提交' }}</span></button>
+              <button v-if="state.task.status === 'FAILED'" class="retry-command" type="button" :disabled="!canRerun" @click="openRerunConfirm">↻ <span>重新执行</span></button>
             </section>
 
             <section v-if="state.task.attempts?.length" class="attempt-history">
@@ -561,5 +688,27 @@ onBeforeUnmount(stopPolling);
         </div>
       </section>
     </main>
+
+    <div v-if="state.showTaskEntry" class="modal-backdrop" role="presentation" @click.self="closeTaskEntry">
+      <section class="task-entry-modal" role="dialog" aria-modal="true" aria-labelledby="task-entry-title">
+        <header class="modal-header"><div><span class="section-kicker">NEW TASK</span><h2 id="task-entry-title">新建任务</h2></div><button class="modal-close" type="button" title="关闭" aria-label="关闭" @click="closeTaskEntry">×</button></header>
+        <p class="modal-intro">先确认你是否知道这笔境外收入对应的所得类型。</p>
+        <div class="task-entry-options">
+          <button type="button" @click="chooseCreateMode('known')"><span class="entry-index">01</span><span><strong>我已知晓所得类型</strong><small>直接选择所得类型并创建材料清单</small></span><b>→</b></button>
+          <button type="button" @click="chooseCreateMode('chat')"><span class="entry-index">02</span><span><strong>我不知道所得类型</strong><small>通过简单对话梳理收入来源和产生方式</small></span><b>→</b></button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="state.showRerunConfirm" class="modal-backdrop" role="presentation" @click.self="closeRerunConfirm">
+      <section class="task-entry-modal rerun-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="rerun-confirm-title" aria-describedby="rerun-confirm-description">
+        <header class="modal-header"><div><span class="section-kicker">RERUN TASK</span><h2 id="rerun-confirm-title">确认重新执行</h2></div><button class="modal-close" type="button" title="关闭" aria-label="关闭" :disabled="state.loading" @click="closeRerunConfirm">×</button></header>
+        <div class="rerun-confirm-content">
+          <p id="rerun-confirm-description">将删除当前结构化结果、人工复核记录和解析历史，并使用现有源文件重新提交。</p>
+          <dl><div><dt>保留</dt><dd>已上传的原始材料文件</dd></div><div><dt>删除</dt><dd>解析结果、复核记录、异常和尝试历史</dd></div></dl>
+        </div>
+        <footer class="rerun-confirm-actions"><button class="text-command" type="button" :disabled="state.loading" @click="closeRerunConfirm">取消</button><button class="confirm-rerun-command" type="button" :disabled="!canRerun" @click="rerunTask">↻ <span>{{ state.loading ? '正在重新执行' : '确认重新执行' }}</span></button></footer>
+      </section>
+    </div>
   </div>
 </template>

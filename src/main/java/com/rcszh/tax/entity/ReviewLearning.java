@@ -14,15 +14,12 @@ public class ReviewLearning {
     private Long id;
     private Long taskId;
     private Long taskItemId;
-    private String requestedDocumentType;
-    private Long resolvedDocumentId;
+    private String workflowCode;
     private String routeSummary;
     private String reviewReasons;
     private String reviewedRecords;
     private String reviewer;
     private String comment;
-    private String suggestedMatchRule;
-    private String fewShotExample;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

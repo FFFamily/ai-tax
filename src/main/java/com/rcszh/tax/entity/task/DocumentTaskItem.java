@@ -18,14 +18,8 @@ public class DocumentTaskItem {
     @JsonProperty("task_id")
     private Long taskId;
 
-    @JsonProperty("document_id")
-    private Long documentId;
-
-    @JsonProperty("requested_document_type")
-    private String requestedDocumentType;
-
-    @JsonProperty("resolved_document_id")
-    private Long resolvedDocumentId;
+    @JsonProperty("workflow_code")
+    private String workflowCode;
 
     @JsonProperty("route_variant")
     private String routeVariant;
@@ -56,9 +50,6 @@ public class DocumentTaskItem {
 
     @JsonProperty("table_result")
     private String tableResult;
-
-    @JsonProperty("file_rule")
-    private String fileRule;
 
     @JsonProperty("review_reasons")
     private String reviewReasons;

@@ -9,10 +9,10 @@ import com.rcszh.tax.enums.RunTaskStatusEnum;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.parser.DocumentParserRegistry;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
-import com.rcszh.tax.server.DocumentServer;
 import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.server.ParseFileServer;
 import com.rcszh.tax.threads.TaskRunnable;
+import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public class DocumentTaskAsyncRunner {
     @Resource
     private DocumentTaskServer documentTaskServer;
     @Resource
-    private DocumentServer documentServer;
+    private DocumentWorkflowRegistry workflowRegistry;
     @Resource
     private RecordPostProcessService recordPostProcessService;
     @Resource
@@ -68,7 +68,7 @@ public class DocumentTaskAsyncRunner {
                     entry -> storageService.resolve(entry.getValue().getStoragePath()),
                     (left, right) -> left,
                     LinkedHashMap::new));
-            new TaskRunnable(parseTaskId, documentTaskServer, documentServer, documentParserRegistry,
+            new TaskRunnable(parseTaskId, documentTaskServer, workflowRegistry, documentParserRegistry,
                     recordPostProcessService, localFilePaths).run();
             executionTaskStateService.markCompleted(executionTaskId, parseTaskId);
         } catch (Exception exception) {

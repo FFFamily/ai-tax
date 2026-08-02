@@ -10,10 +10,8 @@ import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendCandidateService;
 import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendExtractService;
-import com.rcszh.tax.route.DocumentRouteContext;
-import com.rcszh.tax.route.DocumentRouteResult;
-import com.rcszh.tax.route.base.DocumentRouter;
-import com.rcszh.tax.server.DocumentServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
+import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -24,13 +22,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 @Service
 public class ValidationService {
     @Resource
-    private DocumentRouter documentRouter;
-    @Resource
-    private DocumentServer documentServer;
+    private DocumentWorkflowRegistry workflowRegistry;
     @Resource
     private DividendCandidateService dividendCandidateService;
     @Resource
@@ -51,20 +48,16 @@ public class ValidationService {
         report.setId(sampleCase.getId());
         report.setName(sampleCase.getName());
 
-        DocumentRouteContext routeContext = new DocumentRouteContext();
-        routeContext.setRequestedDocumentType(sampleCase.getRequestedDocumentType());
-        routeContext.setFileType(sampleCase.getFileType());
-        routeContext.setDocumentFeatures(sampleCase.getDocumentFeatures());
-        DocumentRouteResult routeResult = documentRouter.route(routeContext);
+        DocumentWorkflow workflow = workflowRegistry.require(sampleCase.getWorkflowCode());
 
         Map<String, Object> routeSummary = new LinkedHashMap<>();
-        routeSummary.put("documentId", routeResult == null ? "" : routeResult.getDocumentId());
-        routeSummary.put("documentType", routeResult == null ? "" : routeResult.getDocumentType());
-        routeSummary.put("variant", routeResult == null ? "" : routeResult.getVariant());
-        routeSummary.put("confidence", routeResult == null ? null : routeResult.getConfidence());
-        routeSummary.put("needHumanReview", routeResult != null && routeResult.isNeedHumanReview());
-        routeSummary.put("routeSource", routeResult == null ? "" : routeResult.getRouteSource());
-        routeSummary.put("reasons", routeResult == null ? List.of() : routeResult.getReasons());
+        routeSummary.put("workflowCode", workflow.code());
+        routeSummary.put("documentType", workflow.documentType());
+        routeSummary.put("variant", "");
+        routeSummary.put("confidence", BigDecimal.ONE);
+        routeSummary.put("needHumanReview", false);
+        routeSummary.put("routeSource", "fixed");
+        routeSummary.put("reasons", List.of("使用代码内固定流程: " + workflow.code()));
         report.setRouteResult(routeSummary);
 
         List<DividendCandidateRecord> candidates = dividendCandidateService.collectCandidates(sampleCase.getTransactionLines());
@@ -80,43 +73,39 @@ public class ValidationService {
         parseResult.setRecords(extracted.stream().map(DividendExtractRecord::toMap).toList());
 
         DocumentTaskItem taskItem = new DocumentTaskItem();
-        taskItem.setRequestedDocumentType(sampleCase.getRequestedDocumentType());
-        if (routeResult != null) {
-            taskItem.setRouteConfidence(routeResult.getConfidence());
-            taskItem.setRouteReason(String.join("；", routeResult.getReasons()));
-            taskItem.setNeedHumanReview(routeResult.isNeedHumanReview());
-            taskItem.setResolvedDocumentId(routeResult.getDocumentId());
-            taskItem.setRouteSummary(toRouteSummary(routeResult));
-        }
-        Map<String, Object> document = routeResult == null ? null : documentServer.getDocument(routeResult.getDocumentId());
-        recordPostProcessService.postProcess(parseResult, taskItem, document);
+        taskItem.setWorkflowCode(sampleCase.getWorkflowCode());
+        taskItem.setRouteConfidence(BigDecimal.ONE);
+        taskItem.setRouteReason("[fixed] 使用代码内固定流程: " + workflow.code());
+        taskItem.setNeedHumanReview(false);
+        taskItem.setRouteSummary(toRouteSummary(workflow));
+        recordPostProcessService.postProcess(parseResult, taskItem, workflow);
 
         Object finalRecords = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         report.setDividendExtractCount(finalRecords instanceof List<?> list ? list.size() : 0);
         report.setNeedHumanReview(Boolean.TRUE.equals(parseResult.getGlobalParam().get("needHumanReview")));
-        collectIssues(sampleCase, routeResult, report);
+        collectIssues(sampleCase, workflow, report);
         return report;
     }
 
-    private ExecutionTaskRouteSummaryResponse toRouteSummary(DocumentRouteResult routeResult) {
+    private ExecutionTaskRouteSummaryResponse toRouteSummary(DocumentWorkflow workflow) {
         ExecutionTaskRouteSummaryResponse summary = new ExecutionTaskRouteSummaryResponse();
-        summary.setDocumentId(routeResult.getDocumentId());
-        summary.setDocumentType(routeResult.getDocumentType());
-        summary.setVariant(routeResult.getVariant());
-        summary.setConfidence(routeResult.getConfidence());
-        summary.setNeedHumanReview(routeResult.isNeedHumanReview());
-        summary.setRouteSource(routeResult.getRouteSource());
-        summary.setReasons(routeResult.getReasons());
+        summary.setWorkflowCode(workflow.code());
+        summary.setDocumentType(workflow.documentType());
+        summary.setVariant("");
+        summary.setConfidence(BigDecimal.ONE);
+        summary.setNeedHumanReview(false);
+        summary.setRouteSource("fixed");
+        summary.setReasons(List.of("使用代码内固定流程: " + workflow.code()));
         return summary;
     }
 
     private void collectIssues(ValidationSampleCase sampleCase,
-                               DocumentRouteResult routeResult,
+                               DocumentWorkflow workflow,
                                ValidationSampleReport report) {
-        if (sampleCase.getExpectedDocumentId() != null) {
-            Long actual = routeResult == null ? null : routeResult.getDocumentId();
-            if (!sampleCase.getExpectedDocumentId().equals(actual)) {
-                report.getIssues().add("路由结果不符合预期: expected=" + sampleCase.getExpectedDocumentId() + ", actual=" + actual);
+        if (sampleCase.getExpectedWorkflowCode() != null) {
+            if (!sampleCase.getExpectedWorkflowCode().equals(workflow.code())) {
+                report.getIssues().add("固定流程不符合预期: expected="
+                        + sampleCase.getExpectedWorkflowCode() + ", actual=" + workflow.code());
             }
         }
         if (sampleCase.getExpectedDividendCandidateCount() != null

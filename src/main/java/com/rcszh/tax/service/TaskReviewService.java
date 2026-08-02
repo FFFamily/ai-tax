@@ -44,9 +44,6 @@ public class TaskReviewService {
         List<String> distinctReviewReasons = reviewReasons.stream().distinct().toList();
         item.setNeedHumanReview(needHumanReview);
         item.setReviewReasons(JSONUtil.toJsonStr(distinctReviewReasons));
-        if (request.getResolvedDocumentId() != null) {
-            item.setResolvedDocumentId(request.getResolvedDocumentId());
-        }
 
         String changeResult = item.getChangeResult();
         JSONObject root = changeResult == null || changeResult.isBlank()
@@ -78,10 +75,6 @@ public class TaskReviewService {
         if (request.getComment() != null && !request.getComment().isBlank()) {
             globalParam.set("reviewComment", request.getComment().trim());
         }
-        if (request.getResolvedDocumentId() != null) {
-            globalParam.set("resolvedDocumentId", request.getResolvedDocumentId());
-        }
-
         item.setChangeResult(root.toString());
         documentTaskServer.updateTaskItem(item);
         DocumentTaskItem updated = documentTaskServer.getTaskItemById(itemId);

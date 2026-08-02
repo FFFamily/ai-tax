@@ -19,8 +19,8 @@ public class ReviewLearningController {
     private ReviewLearningService reviewLearningService;
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> list(@RequestParam(value = "documentType", required = false) String documentType) {
-        List<Map<String, Object>> items = reviewLearningService.listLearnings(documentType);
+    public ApiResponse<Map<String, Object>> list(@RequestParam(value = "workflowCode", required = false) String workflowCode) {
+        List<Map<String, Object>> items = reviewLearningService.listLearnings(workflowCode);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", items.size());
         result.put("items", items);

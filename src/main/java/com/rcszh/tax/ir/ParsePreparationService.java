@@ -4,7 +4,6 @@ import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.dto.ExcelParseResult;
 import com.rcszh.tax.dto.HtmlTable;
 import com.rcszh.tax.dto.MinerUFileParseResult;
-import com.rcszh.tax.server.DocumentServer;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +34,7 @@ public class ParsePreparationService {
     private static final Pattern SPLIT_PATTERN = Pattern.compile("[\\s,;:/()\\[\\]{}|]+");
 
     @Resource
-    private DocumentServer documentServer;
+    private HtmlTableParser htmlTableParser;
 
     public ParsePreparationResult preparePdf(List<MinerUFileParseResult> parseResults) {
         ParsePreparationResult result = new ParsePreparationResult();
@@ -90,7 +89,7 @@ public class ParsePreparationService {
     }
 
     private HtmlTable buildPdfTable(MinerUFileParseResult parseResult) {
-        HtmlTable htmlTable = documentServer.convertTableHtmlToJson(parseResult.getTable_body());
+        HtmlTable htmlTable = htmlTableParser.parse(parseResult.getTable_body());
         htmlTable.setTitle(normalizeTitle(parseResult.getTable_caption()));
         htmlTable.setPageIdx(parseResult.getPage_idx());
         return htmlTable;

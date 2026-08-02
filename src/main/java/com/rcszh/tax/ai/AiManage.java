@@ -9,6 +9,7 @@ import com.rcszh.tax.entity.ChatLog;
 import com.rcszh.tax.enums.DocumentPageTypeEnum;
 import com.rcszh.tax.server.AIDocumentParseServer;
 import com.rcszh.tax.service.ChatLogService;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 
@@ -16,7 +17,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -27,7 +27,10 @@ public abstract class AiManage {
     @Resource
     protected ChatLogService chatLogService;
 
-    public abstract AIParseResult chat(List<? extends BaseParseResult> array, String prompt, String agentCall, Map<String, Object> documentConfig);
+    public abstract AIParseResult chat(List<? extends BaseParseResult> array,
+                                       String prompt,
+                                       String agentCall,
+                                       DocumentWorkflow workflow);
 
     public List<List<? extends BaseParseResult>> groupArrayByConfig(List<? extends BaseParseResult> array, Object pageType, Object pageStep) {
         String type = pageType == null ? DocumentPageTypeEnum.DATA.getCode() : pageType.toString();

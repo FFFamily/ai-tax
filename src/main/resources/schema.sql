@@ -1,40 +1,3 @@
-CREATE TABLE IF NOT EXISTS tax_document (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    type VARCHAR(128),
-    variant VARCHAR(128),
-    filter_type VARCHAR(64),
-    page_type VARCHAR(32),
-    page_step INT,
-    match_rule LONGTEXT,
-    prompt LONGTEXT,
-    global_prompt LONGTEXT,
-    error_record LONGTEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS tax_document_config (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    document_id BIGINT NOT NULL,
-    title_filter VARCHAR(255),
-    table_head_check_rule VARCHAR(1000),
-    sort_num INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS tax_document_field_mapping (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    document_id BIGINT NOT NULL,
-    field_label VARCHAR(255),
-    field_code VARCHAR(128),
-    field_desc VARCHAR(1000),
-    sort_num INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS tax_task (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     status VARCHAR(32) NOT NULL,
@@ -45,9 +8,7 @@ CREATE TABLE IF NOT EXISTS tax_task (
 CREATE TABLE IF NOT EXISTS tax_task_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     task_id BIGINT NOT NULL,
-    document_id BIGINT,
-    requested_document_type VARCHAR(128),
-    resolved_document_id BIGINT,
+    workflow_code VARCHAR(128) NOT NULL,
     route_variant VARCHAR(128),
     route_confidence DECIMAL(5,4),
     route_reason LONGTEXT,
@@ -58,7 +19,6 @@ CREATE TABLE IF NOT EXISTS tax_task_item (
     parse_status VARCHAR(32),
     change_result LONGTEXT,
     table_result LONGTEXT,
-    file_rule LONGTEXT,
     review_reasons LONGTEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -132,15 +92,12 @@ CREATE TABLE IF NOT EXISTS tax_review_learning (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     task_id BIGINT,
     task_item_id BIGINT NOT NULL,
-    requested_document_type VARCHAR(128),
-    resolved_document_id BIGINT,
+    workflow_code VARCHAR(128),
     route_summary LONGTEXT,
     review_reasons LONGTEXT,
     reviewed_records LONGTEXT,
     reviewer VARCHAR(128),
     comment LONGTEXT,
-    suggested_match_rule LONGTEXT,
-    few_shot_example LONGTEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

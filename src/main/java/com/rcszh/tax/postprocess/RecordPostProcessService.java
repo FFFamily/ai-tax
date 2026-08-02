@@ -2,13 +2,13 @@ package com.rcszh.tax.postprocess;
 
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * {@link RecordPostProcessor} 的统一编排服务。
@@ -32,9 +32,11 @@ public class RecordPostProcessService {
      *
      * @param parseResult 待加工的 AI 解析结果；为 {@code null} 时直接返回
      * @param taskItem 当前文档任务项，透传给各处理器
-     * @param document 原始文档元数据，透传给各处理器
+     * @param workflow 固定文档流程，透传给各处理器
      */
-    public void postProcess(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public void postProcess(AIParseResult parseResult,
+                            DocumentTaskItem taskItem,
+                            DocumentWorkflow workflow) {
         if (parseResult == null) {
             return;
         }
@@ -45,11 +47,11 @@ public class RecordPostProcessService {
                 .sorted(Comparator.comparingInt(RecordPostProcessor::order))
                 .toList();
         for (RecordPostProcessor processor : orderedProcessors) {
-            if (!processor.supports(parseResult, taskItem,document)) {
+            if (!processor.supports(parseResult, taskItem, workflow)) {
                 continue;
             }
             try {
-                processor.process(parseResult, taskItem, document);
+                processor.process(parseResult, taskItem, workflow);
                 applied.add(processor.name());
             } catch (Exception e) {
                 parseResult.getWarnings().add("postProcess[" + processor.name() + "]失败：" + e.getMessage());

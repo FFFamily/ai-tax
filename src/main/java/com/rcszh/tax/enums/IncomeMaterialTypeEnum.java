@@ -51,7 +51,7 @@ public enum IncomeMaterialTypeEnum {
     RELATED_BUSINESS_CONTRACT("相关业务合同", null);
 
     private final String label;
-    private final String requestedDocumentType;
+    private final String fixedDocumentType;
 
     public static IncomeMaterialTypeEnum fromCode(String code) {
         return Arrays.stream(values())

@@ -15,17 +15,9 @@ public class ExecutionTaskResultItemResponse {
     @JsonProperty("task_id")
     private Long taskId;
 
-    /** 显式指定的文档模板 ID。 */
-    @JsonProperty("document_id")
-    private Long documentId;
-
-    /** 请求的文档类型。 */
-    @JsonProperty("requested_document_type")
-    private String requestedDocumentType;
-
-    /** 路由后采用的文档模板 ID。 */
-    @JsonProperty("resolved_document_id")
-    private Long resolvedDocumentId;
+    /** 固定流程编码。 */
+    @JsonProperty("workflow_code")
+    private String workflowCode;
 
     /** 路由变体。 */
     @JsonProperty("route_variant")
@@ -66,10 +58,6 @@ public class ExecutionTaskResultItemResponse {
     /** 表格解析结果 JSON。 */
     @JsonProperty("table_result")
     private String tableResult;
-
-    /** 文件识别规则。 */
-    @JsonProperty("file_rule")
-    private String fileRule;
 
     /** 人工复核原因。 */
     @JsonProperty("review_reasons")

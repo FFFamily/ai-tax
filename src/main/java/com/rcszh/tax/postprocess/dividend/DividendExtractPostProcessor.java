@@ -1,6 +1,5 @@
 package com.rcszh.tax.postprocess.dividend;
 
-import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
@@ -8,7 +7,7 @@ import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.model.DividendExtractRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendExtractService;
-import com.rcszh.tax.server.DocumentServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -44,19 +43,17 @@ public class DividendExtractPostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 包含候选中间结果的解析结果
      * @param taskItem 当前文档任务项
-     * @param document 原始文档元数据
+     * @param workflow 固定文档流程
      * @return 存在候选且文档类型包含股息提示时返回 {@code true}
      */
     @Override
     @SuppressWarnings("unchecked")
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         Object candidates = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
         if (!(candidates instanceof List<?> list) || list.isEmpty()) {
             return false;
         }
-        String documentType = document == null ? null : (String) document.get(DocumentServer.TYPE);
-        String requestedDocumentType = taskItem == null ? null : taskItem.getRequestedDocumentType();
-        return containsDividendHint(documentType) || containsDividendHint(requestedDocumentType);
+        return workflow != null && workflow.supports("DIVIDEND");
     }
 
     /**
@@ -67,11 +64,11 @@ public class DividendExtractPostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 承载候选数据和抽取结果的解析结果
      * @param taskItem 当前文档任务项
-     * @param document 原始文档元数据，本方法当前不直接使用
+     * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
     @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         Object candidateObject = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_CANDIDATES);
         if (!(candidateObject instanceof List<?> candidateMaps) || candidateMaps.isEmpty()) {
             return;
@@ -143,16 +140,4 @@ public class DividendExtractPostProcessor implements RecordPostProcessor {
         return record;
     }
 
-    /**
-     * 判断文档类型文本是否包含股息业务提示词。
-     *
-     * @param value 文档类型文本
-     * @return 命中股息提示词时返回 {@code true}
-     */
-    private boolean containsDividendHint(String value) {
-        if (StrUtil.isBlank(value)) {
-            return false;
-        }
-        return value.contains("股息") || value.contains("红利") || value.toLowerCase().contains("dividend");
-    }
 }

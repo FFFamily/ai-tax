@@ -7,6 +7,7 @@ import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -42,11 +43,11 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 包含专项抽取结果的解析结果
      * @param taskItem 当前文档任务项
-     * @param document 原始文档元数据
+     * @param workflow 固定文档流程
      * @return 存在非空股息抽取记录列表时返回 {@code true}
      */
     @Override
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         return records instanceof List<?> list && !list.isEmpty();
     }
@@ -56,11 +57,11 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 承载股息记录、告警和全局复核标志的解析结果
      * @param taskItem 用于同步人工复核状态和路由信息的任务项
-     * @param document 原始文档元数据，本方法当前不直接使用
+     * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
     @SuppressWarnings("unchecked")
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         Object records = parseResult.getGlobalParam().get(ResultBaseFieldConstant.DIVIDEND_EXTRACT_RECORDS);
         if (!(records instanceof List<?> list) || list.isEmpty()) {
             return;

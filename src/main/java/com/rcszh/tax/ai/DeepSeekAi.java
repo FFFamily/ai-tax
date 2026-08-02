@@ -6,7 +6,7 @@ import com.rcszh.tax.config.AppProperties;
 import com.rcszh.tax.dto.BaseParseResult;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.server.AIDocumentParseServer;
-import com.rcszh.tax.server.DocumentServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +17,6 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class DeepSeekAi extends AiManage {
@@ -27,7 +26,10 @@ public class DeepSeekAi extends AiManage {
     private AppProperties appProperties;
 
     @Override
-    public AIParseResult chat(List<? extends BaseParseResult> array, String prompt, String agentCall, Map<String, Object> documentConfig) {
+    public AIParseResult chat(List<? extends BaseParseResult> array,
+                              String prompt,
+                              String agentCall,
+                              DocumentWorkflow workflow) {
         OpenAiApi deepSeekApi = OpenAiApi.builder()
                 .apiKey(appProperties.getAi().getDeepseekApiKey())
                 .baseUrl(appProperties.getAi().getDeepseekBaseUrl())
@@ -47,9 +49,8 @@ public class DeepSeekAi extends AiManage {
                 .saver(new MemorySaver())
                 .build();
         long startTime = System.currentTimeMillis();
-        Object pageType = documentConfig.get(DocumentServer.PAGE_TYPE);
-        Object pageStep = documentConfig.get(DocumentServer.PAGE_STEP);
-        List<List<? extends BaseParseResult>> taskList = groupArrayByConfig(array, pageType, pageStep);
+        List<List<? extends BaseParseResult>> taskList = groupArrayByConfig(
+                array, workflow.pageType(), workflow.pageStep());
         AIParseResult taskResult = doTask(agent, prompt, taskList);
         log.info("耗时：{}秒", (System.currentTimeMillis() - startTime) / 1000);
         return taskResult;

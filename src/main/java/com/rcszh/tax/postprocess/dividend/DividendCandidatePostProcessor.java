@@ -1,6 +1,5 @@
 package com.rcszh.tax.postprocess.dividend;
 
-import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
@@ -8,7 +7,7 @@ import com.rcszh.tax.ir.TransactionLine;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
 import com.rcszh.tax.postprocess.dividend.service.DividendCandidateService;
-import com.rcszh.tax.server.DocumentServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -53,20 +52,18 @@ public class DividendCandidatePostProcessor implements RecordPostProcessor {
      *
      * @param parseResult AI 解析结果
      * @param taskItem 包含标准化交易流水的任务项
-     * @param document 原始文档元数据
+     * @param workflow 固定文档流程
      * @return 有可分析流水且具备股息提示或有效解析结果时返回 {@code true}
      */
     @Override
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         if (taskItem == null) {
             return false;
         }
         if (taskItem.getPreparedTransactionLines() == null || taskItem.getPreparedTransactionLines().isEmpty()) {
             return false;
         }
-        String documentType = document == null ? null : (String) document.get(DocumentServer.TYPE);
-        String requestedDocumentType = taskItem.getRequestedDocumentType();
-        return containsDividendHint(documentType) || containsDividendHint(requestedDocumentType) || parseResult != null;
+        return workflow != null && workflow.supports("DIVIDEND");
     }
 
     /**
@@ -74,10 +71,10 @@ public class DividendCandidatePostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 用于承载候选结果与提示信息的解析结果
      * @param taskItem 提供预处理交易流水的任务项
-     * @param document 原始文档元数据，本方法当前不直接使用
+     * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         // 上游预处理后的统一流水，是候选识别的唯一输入。
         List<TransactionLine> transactionLines = taskItem.getPreparedTransactionLines();
         if (transactionLines == null || transactionLines.isEmpty()) {
@@ -94,16 +91,4 @@ public class DividendCandidatePostProcessor implements RecordPostProcessor {
         parseResult.getWarnings().add("已召回疑似股息相关流水 " + candidates.size() + " 条，待进入专项抽取。");
     }
 
-    /**
-     * 判断文档类型文本是否包含股息业务提示词。
-     *
-     * @param value 文档类型或用户指定的文档类型
-     * @return 包含中文股息/红利或英文 dividend 时返回 {@code true}
-     */
-    private boolean containsDividendHint(String value) {
-        if (StrUtil.isBlank(value)) {
-            return false;
-        }
-        return value.contains("股息") || value.contains("红利") || value.toLowerCase().contains("dividend");
-    }
 }

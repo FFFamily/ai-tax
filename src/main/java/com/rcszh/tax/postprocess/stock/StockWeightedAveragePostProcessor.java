@@ -11,7 +11,7 @@ import com.rcszh.tax.postprocess.stock.model.StockDividendRecord;
 import com.rcszh.tax.postprocess.stock.model.StockEvent;
 import com.rcszh.tax.postprocess.stock.model.StockGroupKey;
 import com.rcszh.tax.postprocess.stock.model.StockPositionState;
-import com.rcszh.tax.server.DocumentServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -62,14 +62,15 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      *
      * @param parseResult AI 解析结果
      * @param taskItem 当前文档任务项
-     * @param document 包含文档类型的元数据
-     * @return 文档类型包含“股票”时返回 {@code true}
+     * @param workflow 固定文档流程
+     * @return 证券日结单或股票交易明细流程返回 {@code true}
      */
     @Override
-    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
-        // documentType 是路由阶段识别的文档类型，用于避免扫描全部 records。
-        String documentType = (String) document.get(DocumentServer.TYPE);
-        return documentType.contains("股票");
+    public boolean supports(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
+        if (workflow == null) {
+            return false;
+        }
+        return workflow.supports("BROKER_STATEMENT");
     }
 
     /**
@@ -82,10 +83,10 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
      *
      * @param parseResult 包含原始股票流水并承载计算结果和告警的解析结果
      * @param taskItem 当前文档任务项，本处理器当前不直接使用
-     * @param document 原始文档元数据，本方法当前不直接使用
+     * @param workflow 固定文档流程，本方法当前不直接使用
      */
     @Override
-    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, Map<String, Object> document) {
+    public void process(AIParseResult parseResult, DocumentTaskItem taskItem, DocumentWorkflow workflow) {
         // 将股票相关流水从 records 中抽出来加工；其他类型记录原样保留，方便后续扩展更多 processor
         /** 预留的股票原始流水集合，用于后续恢复股票与其他记录分流。 */
         List<Map<String, Object>> stockRaw = new ArrayList<>();

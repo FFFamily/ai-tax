@@ -10,8 +10,9 @@ import com.rcszh.tax.enums.RunTaskStatusEnum;
 import com.rcszh.tax.parser.BaseParser;
 import com.rcszh.tax.parser.DocumentParserRegistry;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
-import com.rcszh.tax.server.DocumentServer;
 import com.rcszh.tax.server.DocumentTaskServer;
+import com.rcszh.tax.workflow.DocumentWorkflow;
+import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -23,20 +24,20 @@ public class TaskRunnable implements Runnable {
 
     private final Long taskId;
     private final DocumentTaskServer documentTaskServer;
-    private final DocumentServer documentServer;
+    private final DocumentWorkflowRegistry workflowRegistry;
     private final DocumentParserRegistry documentParserRegistry;
     private final RecordPostProcessService recordPostProcessService;
     private final Map<Long, Path> localFilePaths;
 
     public TaskRunnable(Long taskId,
                         DocumentTaskServer documentTaskServer,
-                        DocumentServer documentServer,
+                        DocumentWorkflowRegistry workflowRegistry,
                         DocumentParserRegistry documentParserRegistry,
                         RecordPostProcessService recordPostProcessService,
                         Map<Long, Path> localFilePaths) {
         this.taskId = taskId;
         this.documentTaskServer = documentTaskServer;
-        this.documentServer = documentServer;
+        this.workflowRegistry = workflowRegistry;
         this.documentParserRegistry = documentParserRegistry;
         this.recordPostProcessService = recordPostProcessService;
         this.localFilePaths = localFilePaths == null ? Map.of() : Map.copyOf(localFilePaths);
@@ -73,14 +74,10 @@ public class TaskRunnable implements Runnable {
                 if (parserResult == null) {
                     throw new IllegalStateException("文档解析结果为空: " + item.getFileUrl());
                 }
-                Long resolvedDocumentId = item.getResolvedDocumentId();
-                if (resolvedDocumentId == null) {
-                    resolvedDocumentId = item.getDocumentId();
-                }
-                logger.info("后处理使用的文档Id：{}", resolvedDocumentId);
-                Map<String, Object> document = documentServer.getDocument(resolvedDocumentId);
+                DocumentWorkflow workflow = workflowRegistry.require(item.getWorkflowCode());
+                logger.info("后处理使用的固定流程：{}", workflow.code());
                 // AI 首次抽取只保证“识别出来”，业务可用性由后处理层补齐、归并和质检。
-                recordPostProcessService.postProcess(parserResult, item, document);
+                recordPostProcessService.postProcess(parserResult, item, workflow);
                 item.setChangeResult(JSONUtil.parse(parserResult).toString());
                 item.setParseStatus(CommonConstant.YES);
                 documentTaskServer.updateTaskItem(item);

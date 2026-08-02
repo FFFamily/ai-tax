@@ -11,9 +11,9 @@ import java.util.List;
 public class ValidationSampleCase {
     private String id;
     private String name;
-    private String requestedDocumentType;
+    private String workflowCode;
     private String fileType;
-    private Long expectedDocumentId;
+    private String expectedWorkflowCode;
     private Integer expectedDividendCandidateCount;
     private Integer expectedDividendExtractCount;
     private Boolean expectNeedHumanReview;

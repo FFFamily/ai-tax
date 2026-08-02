@@ -10,15 +10,19 @@ import com.rcszh.tax.entity.task.DocumentTask;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.entity.task.TaxTask;
 import com.rcszh.tax.entity.task.TaxTaskItem;
+import com.rcszh.tax.entity.ReviewLearning;
 import com.rcszh.tax.enums.RunTaskStatusEnum;
+import com.rcszh.tax.mapper.ReviewLearningMapper;
 import com.rcszh.tax.mapper.TaxTaskItemMapper;
 import com.rcszh.tax.mapper.TaxTaskMapper;
+import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class DocumentTaskServer {
@@ -27,6 +31,10 @@ public class DocumentTaskServer {
     private TaxTaskMapper taxTaskMapper;
     @Resource
     private TaxTaskItemMapper taxTaskItemMapper;
+    @Resource
+    private ReviewLearningMapper reviewLearningMapper;
+    @Resource
+    private DocumentWorkflowRegistry workflowRegistry;
 
     @Transactional(rollbackFor = Exception.class)
     public Long createTask(CreateDocumentTaskDto dto) {
@@ -43,9 +51,7 @@ public class DocumentTaskServer {
             for (CreateDocumentTaskDto.Item source : dto.getItems()) {
                 TaxTaskItem item = new TaxTaskItem();
                 item.setTaskId(task.getId());
-                item.setDocumentId(source.getDocumentId());
-                item.setRequestedDocumentType(source.getDocumentType());
-                item.setResolvedDocumentId(source.getDocumentId());
+                item.setWorkflowCode(source.getWorkflowCode());
                 item.setNeedHumanReview(Boolean.FALSE);
                 item.setRemoteTaskId(source.getRemoteTaskId());
                 item.setFileUrl(source.getFileUrl());
@@ -54,6 +60,24 @@ public class DocumentTaskServer {
             }
         }
         return new CreatedTask(task.getId(), List.copyOf(itemIds));
+    }
+
+    /**
+     * 删除指定内部解析任务及其任务项、解析结果和复核审计记录。
+     *
+     * <p>源文件由执行任务持有，不在这里删除。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTasks(Set<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return;
+        }
+        reviewLearningMapper.delete(new LambdaQueryWrapper<ReviewLearning>()
+                .in(ReviewLearning::getTaskId, taskIds));
+        taxTaskItemMapper.delete(new LambdaQueryWrapper<TaxTaskItem>()
+                .in(TaxTaskItem::getTaskId, taskIds));
+        taxTaskMapper.delete(new LambdaQueryWrapper<TaxTask>()
+                .in(TaxTask::getId, taskIds));
     }
 
 
@@ -131,9 +155,7 @@ public class DocumentTaskServer {
         DocumentTaskItem result = new DocumentTaskItem();
         result.setId(item.getId());
         result.setTaskId(item.getTaskId());
-        result.setDocumentId(item.getDocumentId());
-        result.setRequestedDocumentType(item.getRequestedDocumentType());
-        result.setResolvedDocumentId(item.getResolvedDocumentId());
+        result.setWorkflowCode(item.getWorkflowCode());
         result.setRouteVariant(item.getRouteVariant());
         result.setRouteConfidence(item.getRouteConfidence());
         result.setRouteReason(item.getRouteReason());
@@ -144,7 +166,6 @@ public class DocumentTaskServer {
         result.setParseStatus(item.getParseStatus());
         result.setChangeResult(item.getChangeResult());
         result.setTableResult(item.getTableResult());
-        result.setFileRule(item.getFileRule());
         result.setReviewReasons(item.getReviewReasons());
         result.setRouteSummary(buildRouteSummary(item));
         return result;
@@ -154,9 +175,7 @@ public class DocumentTaskServer {
         TaxTaskItem item = new TaxTaskItem();
         item.setId(source.getId());
         item.setTaskId(source.getTaskId());
-        item.setDocumentId(source.getDocumentId());
-        item.setRequestedDocumentType(source.getRequestedDocumentType());
-        item.setResolvedDocumentId(source.getResolvedDocumentId());
+        item.setWorkflowCode(source.getWorkflowCode());
         item.setRouteVariant(source.getRouteVariant());
         item.setRouteConfidence(source.getRouteConfidence());
         item.setRouteReason(source.getRouteReason());
@@ -167,7 +186,6 @@ public class DocumentTaskServer {
         item.setParseStatus(source.getParseStatus());
         item.setChangeResult(source.getChangeResult());
         item.setTableResult(source.getTableResult());
-        item.setFileRule(source.getFileRule());
         item.setReviewReasons(source.getReviewReasons());
         return item;
     }
@@ -176,9 +194,7 @@ public class DocumentTaskServer {
         ExecutionTaskResultItemResponse result = new ExecutionTaskResultItemResponse();
         result.setId(item.getId());
         result.setTaskId(item.getTaskId());
-        result.setDocumentId(item.getDocumentId());
-        result.setRequestedDocumentType(item.getRequestedDocumentType());
-        result.setResolvedDocumentId(item.getResolvedDocumentId());
+        result.setWorkflowCode(item.getWorkflowCode());
         result.setRouteVariant(item.getRouteVariant());
         result.setRouteConfidence(item.getRouteConfidence());
         result.setRouteReason(item.getRouteReason());
@@ -189,7 +205,6 @@ public class DocumentTaskServer {
         result.setParseStatus(item.getParseStatus());
         result.setChangeResult(item.getChangeResult());
         result.setTableResult(item.getTableResult());
-        result.setFileRule(item.getFileRule());
         result.setReviewReasons(item.getReviewReasons());
         result.setRouteSummary(buildRouteSummary(item));
         return result;
@@ -197,8 +212,8 @@ public class DocumentTaskServer {
 
     private ExecutionTaskRouteSummaryResponse buildRouteSummary(TaxTaskItem item) {
         ExecutionTaskRouteSummaryResponse result = new ExecutionTaskRouteSummaryResponse();
-        result.setDocumentId(item.getResolvedDocumentId());
-        result.setDocumentType(item.getRequestedDocumentType());
+        result.setWorkflowCode(item.getWorkflowCode());
+        result.setDocumentType(workflowRegistry.require(item.getWorkflowCode()).documentType());
         result.setVariant(item.getRouteVariant());
         result.setConfidence(item.getRouteConfidence());
         result.setNeedHumanReview(item.getNeedHumanReview());
@@ -210,6 +225,9 @@ public class DocumentTaskServer {
     private String inferRouteSource(String routeReason) {
         if (StrUtil.isBlank(routeReason)) {
             return "";
+        }
+        if (routeReason.startsWith("[fixed]")) {
+            return "fixed";
         }
         if (routeReason.startsWith("[ai]")) {
             return "ai";
@@ -227,7 +245,7 @@ public class DocumentTaskServer {
         if (StrUtil.isBlank(routeReason)) {
             return List.of();
         }
-        String normalized = routeReason.replaceFirst("^\\[(ai|rule)]\\s*", "");
+        String normalized = routeReason.replaceFirst("^\\[(ai|rule|fixed)]\\s*", "");
         return List.of(normalized.split("；")).stream()
                 .map(String::trim)
                 .filter(StrUtil::isNotBlank)

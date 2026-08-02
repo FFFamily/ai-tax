@@ -8,8 +8,7 @@ public class CreateDocumentTaskDto {
 
     @Data
     public static class Item {
-        private Long documentId;
-        private String documentType;
+        private String workflowCode;
         private String fileUrl;
         private String remoteTaskId;
     }

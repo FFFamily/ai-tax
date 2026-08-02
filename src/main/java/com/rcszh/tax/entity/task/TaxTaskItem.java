@@ -13,9 +13,7 @@ public class TaxTaskItem {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long taskId;
-    private Long documentId;
-    private String requestedDocumentType;
-    private Long resolvedDocumentId;
+    private String workflowCode;
     private String routeVariant;
     private java.math.BigDecimal routeConfidence;
     private String routeReason;
@@ -26,7 +24,6 @@ public class TaxTaskItem {
     private String parseStatus;
     private String changeResult;
     private String tableResult;
-    private String fileRule;
     private String reviewReasons;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

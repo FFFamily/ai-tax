@@ -192,12 +192,12 @@ public class ExecutionTaskController {
     }
 
     /**
-     * 使用原材料重新提交失败的执行任务。
+     * 清理旧解析数据并重新执行已完成或失败的任务。
      *
      * @param taskId 待重新提交的用户执行任务 ID
      * @return 重新提交后的任务详情
      */
-    @Operation(summary = "重新提交失败任务", description = "使用原材料创建新的全量解析尝试")
+    @Operation(summary = "重新执行任务", description = "删除旧解析结果、复核记录和尝试历史，保留源文件并重新提交")
     @PostMapping("/{taskId}/retry")
     public ApiResponse<ExecutionTaskDetailResponse> retry(
             @PathVariable @Parameter(description = "待重新提交的用户执行任务 ID", required = true)

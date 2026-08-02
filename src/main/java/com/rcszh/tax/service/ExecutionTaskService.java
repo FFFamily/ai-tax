@@ -23,6 +23,7 @@ import com.rcszh.tax.mapper.TaxExecutionTaskAttemptMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
+import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -76,6 +77,8 @@ public class ExecutionTaskService {
     private StorageService storageService;
     @Resource
     private DocumentTaskServer documentTaskServer;
+    @Resource
+    private DocumentWorkflowRegistry workflowRegistry;
     @Resource
     private ApplicationEventPublisher eventPublisher;
 
@@ -270,24 +273,46 @@ public class ExecutionTaskService {
     }
 
     /**
-     * 使用原材料重新提交失败任务，并保留上一次内部解析任务。
+     * 使用原材料重新执行已完成或失败任务。
      *
-     * @param taskId 执行任务 ID
-     * @return 重新提交后的任务详情
+     * <p>重新执行会删除旧内部任务、结果、复核记录和尝试历史，但保留用户上传的源文件。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ExecutionTaskDetailResponse retry(Long taskId) {
         TaxExecutionTask task = requireTaskForUpdate(taskId);
-        if (!ExecutionTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
-            throw BusinessException.conflict("只有处理失败的任务可以重新提交");
-        }
-        if (task.getParseTaskId() == null) {
-            throw BusinessException.conflict("失败任务未关联内部解析任务");
+        if (!Set.of(ExecutionTaskStatusEnum.FAILED.name(), ExecutionTaskStatusEnum.COMPLETED.name())
+                .contains(task.getStatus())) {
+            throw BusinessException.conflict("只有已完成或处理失败的任务可以重新执行");
         }
         List<TaxExecutionTaskFile> files = listFiles(taskId);
         validateSubmission(files);
-        ensureCurrentAttemptRecorded(task);
-        return createParseAttempt(task, files, nextAttemptNo(taskId));
+        clearPreviousExecution(task, files);
+        return createParseAttempt(task, files, 1);
+    }
+
+    /**
+     * 清理重新执行前的全部派生数据，保留执行任务和上传文件。
+     */
+    private void clearPreviousExecution(TaxExecutionTask task, List<TaxExecutionTaskFile> files) {
+        Set<Long> parseTaskIds = attemptMapper.selectList(
+                        new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
+                                .eq(TaxExecutionTaskAttempt::getExecutionTaskId, task.getId()))
+                .stream()
+                .map(TaxExecutionTaskAttempt::getParseTaskId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (task.getParseTaskId() != null) {
+            parseTaskIds.add(task.getParseTaskId());
+        }
+
+        fileMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<TaxExecutionTaskFile>()
+                .eq("execution_task_id", task.getId())
+                .set("parse_task_item_id", null));
+        files.forEach(file -> file.setParseTaskItemId(null));
+        attemptMapper.delete(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
+                .eq(TaxExecutionTaskAttempt::getExecutionTaskId, task.getId()));
+        documentTaskServer.deleteTasks(parseTaskIds);
+        task.setParseTaskId(null);
     }
 
     /**
@@ -304,7 +329,8 @@ public class ExecutionTaskService {
             TaxExecutionTaskFile file = files.get(index);
             IncomeMaterialTypeEnum materialType = parseMaterialType(file.getMaterialType());
             CreateDocumentTaskDto.Item item = new CreateDocumentTaskDto.Item();
-            item.setDocumentType(materialType.getRequestedDocumentType());
+            item.setWorkflowCode(workflowRegistry.codeOf(
+                    OverseasIncomeTypeEnum.fromCode(task.getIncomeType()), materialType));
             item.setFileUrl(storageService.buildExecutionFileUrl(
                     task.getId(), file.getId(), file.getOriginalFileName(), false));
             items[index] = item;
@@ -327,13 +353,13 @@ public class ExecutionTaskService {
         task.setSubmittedAt(now);
         task.setErrorMessage(null);
         task.setUpdatedAt(now);
-        taskMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<TaxExecutionTask>()
-                .eq(TaxExecutionTask::getId, task.getId())
-                .set(TaxExecutionTask::getParseTaskId, createdTask.taskId())
-                .set(TaxExecutionTask::getStatus, ExecutionTaskStatusEnum.PROCESSING.name())
-                .set(TaxExecutionTask::getSubmittedAt, now)
-                .set(TaxExecutionTask::getErrorMessage, null)
-                .set(TaxExecutionTask::getUpdatedAt, now));
+        taskMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<TaxExecutionTask>()
+                .eq("id", task.getId())
+                .set("parse_task_id", createdTask.taskId())
+                .set("status", ExecutionTaskStatusEnum.PROCESSING.name())
+                .set("submitted_at", now)
+                .set("error_message", null)
+                .set("updated_at", now));
         for (int index = 0; index < files.size(); index++) {
             TaxExecutionTaskFile file = files.get(index);
             file.setParseTaskItemId(createdTask.itemIds().get(index));
@@ -416,37 +442,6 @@ public class ExecutionTaskService {
         result.setStartedAt(attempt.getStartedAt());
         result.setFinishedAt(attempt.getFinishedAt());
         return result;
-    }
-
-    /**
-     * 兼容迁移前已存在的失败任务，避免它们第一次重试时丢失原尝试。
-     */
-    private void ensureCurrentAttemptRecorded(TaxExecutionTask task) {
-        Long count = attemptMapper.selectCount(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
-                .eq(TaxExecutionTaskAttempt::getParseTaskId, task.getParseTaskId()));
-        if (count != null && count > 0) {
-            return;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        TaxExecutionTaskAttempt attempt = new TaxExecutionTaskAttempt();
-        attempt.setExecutionTaskId(task.getId());
-        attempt.setParseTaskId(task.getParseTaskId());
-        attempt.setAttemptNo(nextAttemptNo(task.getId()));
-        attempt.setStatus(task.getStatus());
-        attempt.setErrorMessage(task.getErrorMessage());
-        attempt.setStartedAt(task.getSubmittedAt() == null ? task.getCreatedAt() : task.getSubmittedAt());
-        attempt.setFinishedAt(task.getUpdatedAt() == null ? now : task.getUpdatedAt());
-        attempt.setCreatedAt(attempt.getStartedAt());
-        attempt.setUpdatedAt(now);
-        attemptMapper.insert(attempt);
-    }
-
-    private int nextAttemptNo(Long taskId) {
-        TaxExecutionTaskAttempt latest = attemptMapper.selectOne(new LambdaQueryWrapper<TaxExecutionTaskAttempt>()
-                .eq(TaxExecutionTaskAttempt::getExecutionTaskId, taskId)
-                .orderByDesc(TaxExecutionTaskAttempt::getAttemptNo)
-                .last("LIMIT 1"));
-        return latest == null ? 1 : latest.getAttemptNo() + 1;
     }
 
     private void validateSubmission(List<TaxExecutionTaskFile> files) {

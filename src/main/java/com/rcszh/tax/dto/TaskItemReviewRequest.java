@@ -13,5 +13,4 @@ public class TaskItemReviewRequest {
     private List<Map<String, Object>> records = new ArrayList<>();
     private String reviewer;
     private String comment;
-    private Long resolvedDocumentId;
 }

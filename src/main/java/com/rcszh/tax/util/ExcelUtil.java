@@ -1,18 +1,15 @@
 package com.rcszh.tax.util;
 
 import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelReader;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
-import com.alibaba.excel.read.builder.ExcelReaderBuilder;
-import com.alibaba.excel.read.builder.ExcelReaderSheetBuilder;
 import com.rcszh.tax.dto.ExcelParseResult;
-import com.rcszh.tax.entity.ExcelFileRule;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,32 +38,18 @@ public class ExcelUtil {
     }
 
 
-    public static List<ExcelParseResult> readExcel(File file, ExcelFileRule sheetInfo) {
+    public static List<ExcelParseResult> readExcel(File file) {
         List<ExcelParseResult> result = new ArrayList<>();
-        if (sheetInfo == null) {
-            sheetInfo = new ExcelFileRule();
-        }
-        Map<String, String> columnMapping = sheetInfo.getFieldMapping();
         NoModelDataListener noModelDataListener = new NoModelDataListener();
-        ExcelReaderBuilder read = EasyExcel.read(file,noModelDataListener );
-        ExcelReaderSheetBuilder excelReaderSheetBuilder ;
-        if (sheetInfo.getSheetName() != null) {
-            excelReaderSheetBuilder = read.sheet().sheetName(sheetInfo.getSheetName());
-        }else if (sheetInfo.getSheetNum() != null) {
-            excelReaderSheetBuilder = read.sheet().sheetNo(sheetInfo.getSheetNum());
-        }else {
-            excelReaderSheetBuilder = read.sheet();
+        try (ExcelReader excelReader = EasyExcel.read(file, noModelDataListener).build()) {
+            excelReader.readAll();
         }
-        excelReaderSheetBuilder.doRead();
         List<NoModelDataListener.RowData> dataList = noModelDataListener.getRows();
-        String sheetName = sheetInfo.getSheetName() != null
-                ? sheetInfo.getSheetName()
-                : "sheet" + (sheetInfo.getSheetNum() == null ? 0 : sheetInfo.getSheetNum());
         for (NoModelDataListener.RowData rowData : dataList) {
             ExcelParseResult excelParseResult = new ExcelParseResult();
             excelParseResult.setExcelData(rowData.getData());
             excelParseResult.setRowIndex(rowData.getRowIndex());
-            excelParseResult.setSheetName(sheetName);
+            excelParseResult.setSheetName(rowData.getSheetName());
             result.add(excelParseResult);
         }
         return result;
@@ -91,6 +74,9 @@ public class ExcelUtil {
             });
             RowData rowData = new RowData();
             rowData.setRowIndex(context.readRowHolder() == null ? null : context.readRowHolder().getRowIndex());
+            String sheetName = context.readSheetHolder() == null ? null : context.readSheetHolder().getSheetName();
+            Integer sheetNo = context.readSheetHolder() == null ? null : context.readSheetHolder().getSheetNo();
+            rowData.setSheetName(sheetName == null ? "sheet" + (sheetNo == null ? 0 : sheetNo) : sheetName);
             rowData.setData(resultData);
             rows.add(rowData);
         }
@@ -104,6 +90,7 @@ public class ExcelUtil {
         @Setter
         public static class RowData {
             private Integer rowIndex;
+            private String sheetName;
             private Map<String, String> data = new LinkedHashMap<>();
         }
     }
