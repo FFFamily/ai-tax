@@ -22,6 +22,21 @@ public class AppProperties {
         private String deepseekApiKey = "sk-9463061a14864d99854fc8f5698e539b";
         private String deepseekBaseUrl = "https://api.deepseek.com";
         private String deepseekModel = "deepseek-v4-flash";
+        private final Rag rag = new Rag();
+    }
+
+    @Data
+    public static class Rag {
+        private boolean enabled = true;
+        private String knowledgeDir = "./data";
+        private String embeddingApiKey = "";
+        private String embeddingBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        private String embeddingModel = "text-embedding-v4";
+        private int embeddingDimensions = 1024;
+        private int chunkSize = 800;
+        private int chunkOverlap = 100;
+        private int maxResults = 4;
+        private double minScore = 0.65;
     }
 
     @Data

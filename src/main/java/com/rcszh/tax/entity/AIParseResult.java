@@ -9,7 +9,7 @@ import java.util.Map;
 
 @Data
 public class AIParseResult {
-    private ChatLog chatLog;
+    // AI 调用日志
     private Map<String,Object> globalParam;
     private List<Map<String, Object>> records;
     private List<Map<String, Object>> errorRecords;
