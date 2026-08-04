@@ -1,11 +1,9 @@
 package com.rcszh.tax.server;
 
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultItemResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
-import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
 import com.rcszh.tax.entity.task.DocumentTask;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.entity.task.TaxTask;
@@ -15,7 +13,6 @@ import com.rcszh.tax.enums.RunTaskStatusEnum;
 import com.rcszh.tax.mapper.ReviewLearningMapper;
 import com.rcszh.tax.mapper.TaxTaskItemMapper;
 import com.rcszh.tax.mapper.TaxTaskMapper;
-import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,14 +30,6 @@ public class DocumentTaskServer {
     private TaxTaskItemMapper taxTaskItemMapper;
     @Resource
     private ReviewLearningMapper reviewLearningMapper;
-    @Resource
-    private DocumentWorkflowRegistry workflowRegistry;
-
-    @Transactional(rollbackFor = Exception.class)
-    public Long createTask(CreateDocumentTaskDto dto) {
-        return createTaskWithItems(dto).taskId();
-    }
-
     @Transactional(rollbackFor = Exception.class)
     public CreatedTask createTaskWithItems(CreateDocumentTaskDto dto) {
         TaxTask task = new TaxTask();
@@ -53,7 +42,6 @@ public class DocumentTaskServer {
                 item.setTaskId(task.getId());
                 item.setWorkflowCode(source.getWorkflowCode());
                 item.setNeedHumanReview(Boolean.FALSE);
-                item.setRemoteTaskId(source.getRemoteTaskId());
                 item.setFileUrl(source.getFileUrl());
                 taxTaskItemMapper.insert(item);
                 itemIds.add(item.getId());
@@ -156,18 +144,11 @@ public class DocumentTaskServer {
         result.setId(item.getId());
         result.setTaskId(item.getTaskId());
         result.setWorkflowCode(item.getWorkflowCode());
-        result.setRouteVariant(item.getRouteVariant());
-        result.setRouteConfidence(item.getRouteConfidence());
-        result.setRouteReason(item.getRouteReason());
         result.setNeedHumanReview(item.getNeedHumanReview());
-        result.setRemoteTaskId(item.getRemoteTaskId());
         result.setTaskResult(item.getTaskResult());
         result.setFileUrl(item.getFileUrl());
-        result.setParseStatus(item.getParseStatus());
         result.setChangeResult(item.getChangeResult());
-        result.setTableResult(item.getTableResult());
         result.setReviewReasons(item.getReviewReasons());
-        result.setRouteSummary(buildRouteSummary(item));
         applyLatestReview(result, latestReview(item.getId()));
         return result;
     }
@@ -177,16 +158,10 @@ public class DocumentTaskServer {
         item.setId(source.getId());
         item.setTaskId(source.getTaskId());
         item.setWorkflowCode(source.getWorkflowCode());
-        item.setRouteVariant(source.getRouteVariant());
-        item.setRouteConfidence(source.getRouteConfidence());
-        item.setRouteReason(source.getRouteReason());
         item.setNeedHumanReview(source.getNeedHumanReview());
-        item.setRemoteTaskId(source.getRemoteTaskId());
         item.setTaskResult(source.getTaskResult());
         item.setFileUrl(source.getFileUrl());
-        item.setParseStatus(source.getParseStatus());
         item.setChangeResult(source.getChangeResult());
-        item.setTableResult(source.getTableResult());
         item.setReviewReasons(source.getReviewReasons());
         return item;
     }
@@ -196,18 +171,10 @@ public class DocumentTaskServer {
         result.setId(item.getId());
         result.setTaskId(item.getTaskId());
         result.setWorkflowCode(item.getWorkflowCode());
-        result.setRouteVariant(item.getRouteVariant());
-        result.setRouteConfidence(item.getRouteConfidence());
-        result.setRouteReason(item.getRouteReason());
         result.setNeedHumanReview(item.getNeedHumanReview());
-        result.setRemoteTaskId(item.getRemoteTaskId());
-        result.setTaskResult(item.getTaskResult());
         result.setFileUrl(item.getFileUrl());
-        result.setParseStatus(item.getParseStatus());
         result.setChangeResult(item.getChangeResult());
-        result.setTableResult(item.getTableResult());
         result.setReviewReasons(item.getReviewReasons());
-        result.setRouteSummary(buildRouteSummary(item));
         applyLatestReview(result, latestReview(item.getId()));
         return result;
     }
@@ -238,45 +205,4 @@ public class DocumentTaskServer {
         item.setReviewComment(review.getComment());
     }
 
-    private ExecutionTaskRouteSummaryResponse buildRouteSummary(TaxTaskItem item) {
-        ExecutionTaskRouteSummaryResponse result = new ExecutionTaskRouteSummaryResponse();
-        result.setWorkflowCode(item.getWorkflowCode());
-        result.setDocumentType(workflowRegistry.require(item.getWorkflowCode()).documentType());
-        result.setVariant(item.getRouteVariant());
-        result.setConfidence(item.getRouteConfidence());
-        result.setNeedHumanReview(item.getNeedHumanReview());
-        result.setRouteSource(inferRouteSource(item.getRouteReason()));
-        result.setReasons(splitRouteReasons(item.getRouteReason()));
-        return result;
-    }
-
-    private String inferRouteSource(String routeReason) {
-        if (StrUtil.isBlank(routeReason)) {
-            return "";
-        }
-        if (routeReason.startsWith("[fixed]")) {
-            return "fixed";
-        }
-        if (routeReason.startsWith("[ai]")) {
-            return "ai";
-        }
-        if (routeReason.startsWith("[rule]")) {
-            return "rule";
-        }
-        if (routeReason.contains("显式指定")) {
-            return "manual";
-        }
-        return "rule";
-    }
-
-    private List<String> splitRouteReasons(String routeReason) {
-        if (StrUtil.isBlank(routeReason)) {
-            return List.of();
-        }
-        String normalized = routeReason.replaceFirst("^\\[(ai|rule|fixed)]\\s*", "");
-        return List.of(normalized.split("；")).stream()
-                .map(String::trim)
-                .filter(StrUtil::isNotBlank)
-                .toList();
-    }
 }

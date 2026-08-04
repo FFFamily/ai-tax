@@ -14,16 +14,10 @@ public class TaxTaskItem {
     private Long id;
     private Long taskId;
     private String workflowCode;
-    private String routeVariant;
-    private java.math.BigDecimal routeConfidence;
-    private String routeReason;
     private Boolean needHumanReview;
-    private String remoteTaskId;
     private String taskResult;
     private String fileUrl;
-    private String parseStatus;
     private String changeResult;
-    private String tableResult;
     private String reviewReasons;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

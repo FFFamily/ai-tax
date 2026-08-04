@@ -49,8 +49,7 @@ public class DeepSeekAi extends AiManage {
                 .saver(new MemorySaver())
                 .build();
         long startTime = System.currentTimeMillis();
-        List<List<? extends BaseParseResult>> taskList = groupArrayByConfig(
-                array, workflow.pageType(), workflow.pageStep());
+        List<List<? extends BaseParseResult>> taskList = groupArray(array, workflow.pageStep());
         AIParseResult taskResult = doTask(agent, prompt, taskList);
         log.info("耗时：{}秒", (System.currentTimeMillis() - startTime) / 1000);
         return taskResult;

@@ -46,8 +46,7 @@ public class ExcelParser extends BaseParser{
         DocumentWorkflow workflow = resolveWorkflow(info, workflowRegistry);
         logger.info("使用固定文档流程：{}", workflow.code());
         info.setPreparedTransactionLines(preparation.getTransactionLines());
-        info.setPreparedDocumentFeatures(preparation.getDocumentFeatures());
         String prompt = workflow.buildPrompt();
-        return deepSeekAi.chat(results, prompt, null, workflow);
+        return deepSeekAi.chat(results, prompt, "", workflow);
     }
 }

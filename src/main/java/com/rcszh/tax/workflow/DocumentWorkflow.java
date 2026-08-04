@@ -1,7 +1,5 @@
 package com.rcszh.tax.workflow;
 
-import com.rcszh.tax.enums.DocumentPageTypeEnum;
-
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -14,19 +12,14 @@ import java.util.StringJoiner;
  */
 public record DocumentWorkflow(
         String code,
-        String name,
         String documentType,
         Set<String> capabilities,
-        String filterType,
-        String pageType,
         int pageStep,
         String prompt,
         String errorRecord,
         List<DocumentOutputField> outputFields) {
 
     public DocumentWorkflow {
-        filterType = filterType == null || filterType.isBlank() ? "all" : filterType;
-        pageType = pageType == null || pageType.isBlank() ? DocumentPageTypeEnum.DATA.getCode() : pageType;
         pageStep = pageStep <= 0 ? 20 : pageStep;
         prompt = prompt == null ? "" : prompt;
         errorRecord = errorRecord == null ? "" : errorRecord;

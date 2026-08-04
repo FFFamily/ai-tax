@@ -53,14 +53,6 @@ public class StorageService {
         }
     }
 
-    public boolean hasPublicBaseUrl() {
-        return StringUtils.hasText(properties.getStorage().getPublicBaseUrl());
-    }
-
-    public String buildExecutionFileUrl(Long taskId, Long fileId, boolean publicUrl) {
-        return buildExecutionFileUrl(taskId, fileId, null, publicUrl);
-    }
-
     public String buildExecutionFileUrl(Long taskId, Long fileId, String originalFileName, boolean publicUrl) {
         String baseUrl = publicUrl
                 ? properties.getStorage().getPublicBaseUrl()

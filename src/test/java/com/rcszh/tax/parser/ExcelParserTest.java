@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +46,7 @@ class ExcelParserTest {
 
         AIParseResult expected = new AIParseResult();
         DeepSeekAi deepSeekAi = mock(DeepSeekAi.class);
-        when(deepSeekAi.chat(anyList(), anyString(), isNull(),
+        when(deepSeekAi.chat(anyList(), anyString(), eq(""),
                 org.mockito.ArgumentMatchers.any(DocumentWorkflow.class))).thenReturn(expected);
 
         ExcelParser parser = new ExcelParser();
@@ -64,7 +64,7 @@ class ExcelParserTest {
 
         assertThat(actual).isSameAs(expected);
         verify(preparationService).prepareExcel(org.mockito.ArgumentMatchers.<List<ExcelParseResult>>any());
-        verify(deepSeekAi).chat(anyList(), anyString(), isNull(),
+        verify(deepSeekAi).chat(anyList(), anyString(), eq(""),
                 org.mockito.ArgumentMatchers.any(DocumentWorkflow.class));
     }
 

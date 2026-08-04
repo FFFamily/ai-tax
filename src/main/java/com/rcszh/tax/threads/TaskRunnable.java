@@ -2,7 +2,6 @@ package com.rcszh.tax.threads;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.rcszh.tax.common.CommonConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTask;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
@@ -79,7 +78,6 @@ public class TaskRunnable implements Runnable {
                 // AI 首次抽取只保证“识别出来”，业务可用性由后处理层补齐、归并和质检。
                 recordPostProcessService.postProcess(parserResult, item, workflow);
                 item.setChangeResult(JSONUtil.parse(parserResult).toString());
-                item.setParseStatus(CommonConstant.YES);
                 documentTaskServer.updateTaskItem(item);
             } catch (Exception e) {
                 logger.error("解析失败", e);

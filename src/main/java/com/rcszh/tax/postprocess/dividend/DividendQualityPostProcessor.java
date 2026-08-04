@@ -112,16 +112,6 @@ public class DividendQualityPostProcessor implements RecordPostProcessor {
                 }
             }
         }
-        if (taskItem.getRouteSummary() != null) {
-            // 模板路由本身置信度过低时，即使字段看起来完整，也要提醒人工确认模板是否选对。
-            BigDecimal routeConfidence = taskItem.getRouteSummary().getConfidence();
-            if (routeConfidence != null && routeConfidence.compareTo(new BigDecimal("0.60")) < 0) {
-                needHumanReview = true;
-                taskItem.setNeedHumanReview(true);
-                reviewReasons.add("路由置信度低于0.60");
-                parseResult.getWarnings().add("文档路由置信度较低，建议人工确认模板。");
-            }
-        }
         List<String> finalReviewReasons = reviewReasons.stream().distinct().toList();
         if (needHumanReview) {
             taskItem.setNeedHumanReview(true);

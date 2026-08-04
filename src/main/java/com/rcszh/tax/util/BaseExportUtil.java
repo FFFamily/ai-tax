@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class BaseExportUtil {
     /**
@@ -25,10 +24,6 @@ public class BaseExportUtil {
      */
     public static void export(HashMap<String,Object> data, List<SheetConfig> dataConfig, OutputStream outputStream) throws IOException {
         SXSSFWorkbook workbook = new SXSSFWorkbook(); // 使用流式API防止内存溢出
-
-        // 1. 样式缓存池 (关键！POI限制一个Workbook最多约4000个CellStyle)
-        // Key可以是 StyleConfig 的 hash 或 toString
-        Map<String, CellStyle> styleCache = new HashMap<>();
 
         for (SheetConfig sheetConf : dataConfig) {
             Sheet sheet = workbook.createSheet(sheetConf.getSheetName());
@@ -52,7 +47,7 @@ public class BaseExportUtil {
                     Object value = data.get(cellConf.getSourceKey());
                     cell.setCellValue(value == null ? "缺失数据，请检查数据完整性" :value.toString());
                     // C. 设置样式 (从缓存获取或创建)
-                    CellStyle style = getCellStyle(workbook, styleCache, cellConf.getStyle());
+                    CellStyle style = getCellStyle(workbook, cellConf.getStyle());
                     cell.setCellStyle(style);
                     // D. 处理合并单元格 (Merge)
                     if (cellConf.getRowSpan() > 1 || cellConf.getColSpan() > 1) {
@@ -66,7 +61,7 @@ public class BaseExportUtil {
                         // E. 重要：合并后的边框处理
                         // POI 合并后，只有左上角单元格有样式，需要使用 RegionUtil 为整个合并区域设置边框
                         if (cellConf.getStyle() != null && cellConf.getStyle().isBorder()) {
-                            fixRegionBorder(region, sheet, workbook);
+                            fixRegionBorder(region, sheet);
                         }
                     }
                 }
@@ -76,10 +71,7 @@ public class BaseExportUtil {
     }
 
     // 获取或创建样式
-    private static CellStyle getCellStyle(Workbook workbook, Map<String, CellStyle> cache, StyleConfig conf) {
-        // TODO: 启用样式缓存以优化性能（POI限制一个Workbook最多约4000个CellStyle）
-        // String key = conf.getUniqueKey();
-        // return cache.computeIfAbsent(key, k -> { ... });
+    private static CellStyle getCellStyle(Workbook workbook, StyleConfig conf) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
         // 字体设置
@@ -113,9 +105,8 @@ public class BaseExportUtil {
      *
      * @param region 合并单元格区域
      * @param sheet 工作表
-     * @param workbook 工作簿
      */
-    private static void fixRegionBorder(CellRangeAddress region, Sheet sheet, Workbook workbook) {
+    private static void fixRegionBorder(CellRangeAddress region, Sheet sheet) {
         // 创建边框样式（使用细线边框）
         BorderStyle borderStyle = BorderStyle.THIN;
 

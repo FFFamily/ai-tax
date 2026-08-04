@@ -9,16 +9,10 @@ CREATE TABLE IF NOT EXISTS tax_task_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     task_id BIGINT NOT NULL,
     workflow_code VARCHAR(128) NOT NULL,
-    route_variant VARCHAR(128),
-    route_confidence DECIMAL(5,4),
-    route_reason LONGTEXT,
     need_human_review TINYINT(1) DEFAULT 0,
-    remote_task_id VARCHAR(128),
     task_result LONGTEXT,
     file_url VARCHAR(1000) NOT NULL,
-    parse_status VARCHAR(32),
     change_result LONGTEXT,
-    table_result LONGTEXT,
     review_reasons LONGTEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -83,7 +77,6 @@ CREATE TABLE IF NOT EXISTS tax_chat_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     prompt LONGTEXT,
     result LONGTEXT,
-    token INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -93,7 +86,6 @@ CREATE TABLE IF NOT EXISTS tax_review_learning (
     task_id BIGINT,
     task_item_id BIGINT NOT NULL,
     workflow_code VARCHAR(128),
-    route_summary LONGTEXT,
     review_reasons LONGTEXT,
     reviewed_records LONGTEXT,
     reviewer VARCHAR(128),

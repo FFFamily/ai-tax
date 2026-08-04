@@ -163,7 +163,6 @@ public class DividendAiEnhanceService {
         try {
             AssistantMessage response = agent.call(prompt);
             chatLog.setResult(response == null ? "" : response.getText());
-            chatLog.setToken(response == null || response.getText() == null ? 0 : response.getText().length());
             chatLogService.save(chatLog);
             return response == null ? "" : response.getText();
         } catch (GraphRunnerException e) {

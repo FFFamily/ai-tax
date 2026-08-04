@@ -10,7 +10,6 @@ public class CreateDocumentTaskDto {
     public static class Item {
         private String workflowCode;
         private String fileUrl;
-        private String remoteTaskId;
     }
 
 }

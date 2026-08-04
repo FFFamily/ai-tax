@@ -41,4 +41,6 @@ build/
 data
 log.path_IS_UNDEFINED
 src/main/resources/application-local.yaml
-src/main/resources/static
+src/main/resources/static/*
+!src/main/resources/static/workbench/
+!src/main/resources/static/workbench/**

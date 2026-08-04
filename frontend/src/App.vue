@@ -41,7 +41,6 @@ const parsedResult = computed(() => {
   }
 });
 const records = computed(() => parsedResult.value.records || []);
-const routeSummary = computed(() => activeItem.value.route_summary || {});
 const statusClass = computed(() => ({
   COLLECTING: 'pending', PROCESSING: 'running', COMPLETED: 'success', FAILED: 'fail'
 }[state.task?.status] || 'pending'));
@@ -94,7 +93,6 @@ const evidenceRows = computed(() => records.value.flatMap((record, recordIndex) 
     detail: formatEvidenceDetail(record.evidence?.[rowId])
   }));
 }));
-const routeConfidence = computed(() => routeSummary.value.confidence ?? activeItem.value.route_confidence);
 
 async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
@@ -543,7 +541,7 @@ onBeforeUnmount(stopPolling);
             <span class="message-avatar">T</span>
             <div class="message-body">
               <div class="message-meta"><strong>Tax Agent</strong><span>INTENT</span></div>
-              <p>已识别为“{{ state.task.incomeTypeLabel }}”处理任务。我会结合材料完整度、文档路由和质量规则推进处理。</p>
+              <p>已识别为“{{ state.task.incomeTypeLabel }}”处理任务。我会结合材料完整度、固定流程和质量规则推进处理。</p>
               <div class="capability-row"><span>意图已确认</span><span>{{ state.task.expectedMaterialCount }} 项材料</span><span>{{ state.task.fileCount }} 份文件</span></div>
             </div>
           </article>
@@ -558,17 +556,16 @@ onBeforeUnmount(stopPolling);
             <ol class="phase-list">
               <li :class="{ done: taskPhase >= 1 }"><span>01</span><div><strong>理解意图</strong><small>所得类型与任务范围</small></div></li>
               <li :class="{ done: taskPhase >= 2 }"><span>02</span><div><strong>收集材料</strong><small>{{ state.task.uploadedMaterialCount }}/{{ state.task.expectedMaterialCount }} 项已就绪</small></div></li>
-              <li :class="{ done: taskPhase >= 3, active: state.task.status === 'PROCESSING' || state.task.status === 'FAILED' }"><span>03</span><div><strong>解析与校验</strong><small>{{ state.task.status === 'FAILED' ? '等待重试' : state.task.status === 'PROCESSING' ? '正在处理' : '路由、抽取与质量检查' }}</small></div></li>
+              <li :class="{ done: taskPhase >= 3, active: state.task.status === 'PROCESSING' || state.task.status === 'FAILED' }"><span>03</span><div><strong>解析与校验</strong><small>{{ state.task.status === 'FAILED' ? '等待重试' : state.task.status === 'PROCESSING' ? '正在处理' : '抽取与质量检查' }}</small></div></li>
               <li :class="{ done: taskPhase >= 4 }"><span>04</span><div><strong>复核与导出</strong><small>{{ state.task.status === 'COMPLETED' ? '结果已生成' : '等待结构化结果' }}</small></div></li>
             </ol>
           </section>
 
           <section class="agent-block decision-block">
-            <div class="agent-block-heading"><div><span class="section-kicker">AGENT DECISION</span><h2>Agent 决策</h2></div><span class="decision-confidence">{{ formatConfidence(routeConfidence) }}</span></div>
+            <div class="agent-block-heading"><div><span class="section-kicker">EXECUTION</span><h2>执行信息</h2></div></div>
             <dl class="decision-grid">
-              <div><dt>处理路径</dt><dd>{{ routeSummary.variant || activeItem.route_variant || (state.task.status === 'COLLECTING' ? '等待提交后路由' : '正在确定模板') }}</dd></div>
+              <div><dt>固定流程</dt><dd>{{ activeItem.workflow_code || (state.task.status === 'COLLECTING' ? '提交后确定' : '正在准备') }}</dd></div>
               <div><dt>人工介入</dt><dd>{{ review.needHumanReview ? '需要复核' : '尚未要求' }}</dd></div>
-              <div v-if="routeSummary.reason || activeItem.route_reason" class="decision-reason"><dt>决策依据</dt><dd>{{ routeSummary.reason || activeItem.route_reason }}</dd></div>
             </dl>
           </section>
 
@@ -665,7 +662,7 @@ onBeforeUnmount(stopPolling);
                 <div v-if="!records.length" class="empty-result"><span class="empty-icon">∅</span><strong>{{ state.task.status === 'PROCESSING' ? '正在等待解析结果' : '没有可展示的记录' }}</strong><small>{{ parsedResult.warnings?.[0] || activeItem.review_reasons || state.task.errorMessage || '当前材料类型尚未配置专属抽取模板。' }}</small></div>
                 <div v-else class="table-wrap"><table><thead><tr><th>#</th><th>日期</th><th>付款方</th><th>币种</th><th>净额</th><th>预扣税</th><th>毛额</th><th>证据行</th><th>置信度</th><th>质量</th></tr></thead><tbody><tr v-for="(record, index) in records" :key="record.record_id || index"><td class="row-index">{{ String(index + 1).padStart(2, '0') }}</td><td>{{ record.dividendDate || '—' }}</td><td class="primary-cell">{{ record.payer || '—' }}</td><td>{{ record.currency || '—' }}</td><td>{{ record.netAmount ?? '—' }}</td><td>{{ record.withholdingTax ?? '—' }}</td><td>{{ record.grossAmount ?? '—' }}</td><td><span class="evidence-chip">{{ record.evidenceRowIds?.length || 0 }} 行</span></td><td>{{ formatConfidence(record.confidence) }}</td><td><span class="quality-label" :class="{ alert: record.needHumanReview || record.qualityWarnings?.length }">{{ record.needHumanReview || record.qualityWarnings?.length ? '待复核' : '通过' }}</span></td></tr></tbody></table></div>
               </div>
-              <div v-if="state.result" class="result-foot"><span>内部任务 {{ trimId(state.task.parseTaskId) }}</span><span>{{ routeSummary.variant || activeItem.route_variant || '等待模板路由' }}</span></div>
+              <div v-if="state.result" class="result-foot"><span>内部任务 {{ trimId(state.task.parseTaskId) }}</span><span>{{ activeItem.workflow_code || '固定流程' }}</span></div>
             </section>
 
             <section class="artifact-section evidence-section">

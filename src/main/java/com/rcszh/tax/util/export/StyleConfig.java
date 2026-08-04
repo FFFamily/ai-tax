@@ -17,9 +17,4 @@ public class StyleConfig {
     // 是否边框
     private boolean isBorder = true;
 
-    private boolean isBorderBottomOnly = false;
-
-    public String getUniqueKey() {
-        return String.format("%d_%b",fontSize, bold);
-    }
 }

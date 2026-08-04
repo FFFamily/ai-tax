@@ -2,7 +2,6 @@ package com.rcszh.tax.validation;
 
 import cn.hutool.json.JSONUtil;
 import com.rcszh.tax.entity.AIParseResult;
-import com.rcszh.tax.dto.executiontask.ExecutionTaskRouteSummaryResponse;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
@@ -16,10 +15,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.math.BigDecimal;
 
 @Service
 public class ValidationService {
@@ -45,16 +41,6 @@ public class ValidationService {
 
         DocumentWorkflow workflow = workflowRegistry.require(sampleCase.getWorkflowCode());
 
-        Map<String, Object> routeSummary = new LinkedHashMap<>();
-        routeSummary.put("workflowCode", workflow.code());
-        routeSummary.put("documentType", workflow.documentType());
-        routeSummary.put("variant", "");
-        routeSummary.put("confidence", BigDecimal.ONE);
-        routeSummary.put("needHumanReview", false);
-        routeSummary.put("routeSource", "fixed");
-        routeSummary.put("reasons", List.of("使用代码内固定流程: " + workflow.code()));
-        report.setRouteResult(routeSummary);
-
         List<DividendCandidateRecord> candidates = dividendCandidateService.collectCandidates(sampleCase.getTransactionLines());
         report.setDividendCandidateCount(candidates.size());
 
@@ -62,10 +48,7 @@ public class ValidationService {
 
         DocumentTaskItem taskItem = new DocumentTaskItem();
         taskItem.setWorkflowCode(sampleCase.getWorkflowCode());
-        taskItem.setRouteConfidence(BigDecimal.ONE);
-        taskItem.setRouteReason("[fixed] 使用代码内固定流程: " + workflow.code());
         taskItem.setNeedHumanReview(false);
-        taskItem.setRouteSummary(toRouteSummary(workflow));
         taskItem.setPreparedTransactionLines(sampleCase.getTransactionLines());
         recordPostProcessService.postProcess(parseResult, taskItem, workflow);
 
@@ -73,18 +56,6 @@ public class ValidationService {
         report.setNeedHumanReview(Boolean.TRUE.equals(taskItem.getNeedHumanReview()));
         collectIssues(sampleCase, workflow, report);
         return report;
-    }
-
-    private ExecutionTaskRouteSummaryResponse toRouteSummary(DocumentWorkflow workflow) {
-        ExecutionTaskRouteSummaryResponse summary = new ExecutionTaskRouteSummaryResponse();
-        summary.setWorkflowCode(workflow.code());
-        summary.setDocumentType(workflow.documentType());
-        summary.setVariant("");
-        summary.setConfidence(BigDecimal.ONE);
-        summary.setNeedHumanReview(false);
-        summary.setRouteSource("fixed");
-        summary.setReasons(List.of("使用代码内固定流程: " + workflow.code()));
-        return summary;
     }
 
     private void collectIssues(ValidationSampleCase sampleCase,

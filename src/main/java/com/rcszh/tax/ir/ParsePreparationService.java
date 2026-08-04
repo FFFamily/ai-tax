@@ -9,15 +9,10 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Component
@@ -31,8 +26,6 @@ public class ParsePreparationService {
     private static final String[] AMOUNT_HEADERS = {"amount", "transactionamount", "发生额", "金额", "变动金额", "成交金额"};
     private static final String[] BALANCE_HEADERS = {"balance", "余额", "结余"};
     private static final String[] CURRENCY_HEADERS = {"currency", "ccy", "币种", "currencycode"};
-    private static final Pattern SPLIT_PATTERN = Pattern.compile("[\\s,;:/()\\[\\]{}|]+");
-
     @Resource
     private HtmlTableParser htmlTableParser;
 
@@ -41,28 +34,19 @@ public class ParsePreparationService {
         if (parseResults == null || parseResults.isEmpty()) {
             return result;
         }
-        // PDF 先从 OCR 结果里抽取文本样本、表格块，再统一转换成交易行 IR，供路由和后处理共享。
-        List<String> textSamples = parseResults.stream()
-                .map(MinerUFileParseResult::getText)
-                .filter(StrUtil::isNotBlank)
-                .limit(20)
-                .toList();
+        // PDF 先从 OCR 结果里抽取表格块，再统一转换成交易行 IR。
         List<MinerUFileParseResult> tableBlocks = parseResults.stream()
                 .filter(item -> "table".equalsIgnoreCase(item.getType()))
                 .filter(item -> StrUtil.isNotBlank(item.getTable_body()))
                 .toList();
-        List<HtmlTable> htmlTables = new ArrayList<>();
         List<TransactionLine> lines = new ArrayList<>();
         int tableIndex = 0;
         for (MinerUFileParseResult tableBlock : tableBlocks) {
             HtmlTable htmlTable = buildPdfTable(tableBlock);
-            htmlTables.add(htmlTable);
             lines.addAll(buildLinesFromTable(htmlTable, tableIndex, "pdf"));
             tableIndex++;
         }
-        result.setHtmlTables(htmlTables);
         result.setTransactionLines(lines);
-        result.setDocumentFeatures(buildFeaturesFromTables("pdf", lines, htmlTables, textSamples));
         return result;
     }
 
@@ -77,14 +61,13 @@ public class ParsePreparationService {
             lines.add(buildLineFromMap(
                     parseResult.getExcelData(),
                     buildExcelRowId(parseResult),
-                    parseResult.getPageIndex(),
+                    null,
                     "excel",
                     parseResult.getSheetName(),
                     buildExcelEvidence(parseResult)
             ));
         }
         result.setTransactionLines(lines);
-        result.setDocumentFeatures(buildFeaturesFromHeaders("excel", lines, buildExcelHeaders(parseResults), buildExcelTextSamples(parseResults)));
         return result;
     }
 
@@ -179,103 +162,6 @@ public class ParsePreparationService {
         line.setAmount(amount.abs());
     }
 
-    private DocumentFeatures buildFeaturesFromTables(String fileType,
-                                                     List<TransactionLine> lines,
-                                                     List<HtmlTable> htmlTables,
-                                                     List<String> textSamples) {
-        DocumentFeatures features = baseFeatures(fileType, lines, textSamples);
-        features.setTableHeaders(htmlTables.stream()
-                .map(HtmlTable::getHead)
-                .filter(Objects::nonNull)
-                .toList());
-        features.setTableCount(htmlTables.size());
-        applyHeaderFlags(features, features.getTableHeaders());
-        return features;
-    }
-
-    private DocumentFeatures buildFeaturesFromHeaders(String fileType,
-                                                      List<TransactionLine> lines,
-                                                      List<List<String>> tableHeaders,
-                                                      List<String> textSamples) {
-        DocumentFeatures features = baseFeatures(fileType, lines, textSamples);
-        features.setTableHeaders(tableHeaders);
-        features.setTableCount(tableHeaders.isEmpty() ? 0 : tableHeaders.size());
-        applyHeaderFlags(features, tableHeaders);
-        return features;
-    }
-
-    private DocumentFeatures baseFeatures(String fileType,
-                                          List<TransactionLine> lines,
-                                          List<String> textSamples) {
-        // 这些特征既用于模板路由，也作为 AI 补充上下文和后处理规则的依据。
-        DocumentFeatures features = new DocumentFeatures();
-        features.setFileType(fileType);
-        features.setLineCount(lines.size());
-        features.setTextSamples(textSamples.stream().limit(10).toList());
-        features.setHasDateColumn(lines.stream().anyMatch(line -> StrUtil.isNotBlank(line.getTradeDate()) || StrUtil.isNotBlank(line.getPostDate())));
-        features.setHasAmountColumn(lines.stream().anyMatch(line -> line.getAmount() != null));
-        features.setDetectedCurrencies(lines.stream()
-                .map(TransactionLine::getCurrency)
-                .filter(StrUtil::isNotBlank)
-                .distinct()
-                .toList());
-        List<String> keywordSources = new ArrayList<>();
-        keywordSources.addAll(textSamples);
-        lines.stream()
-                .map(TransactionLine::getSummary)
-                .filter(StrUtil::isNotBlank)
-                .limit(20)
-                .forEach(keywordSources::add);
-        lines.stream()
-                .flatMap(line -> line.getRawData().keySet().stream())
-                .filter(StrUtil::isNotBlank)
-                .forEach(keywordSources::add);
-        features.setTopKeywords(extractTopKeywords(keywordSources));
-        features.setCandidateInstitutions(extractCandidateInstitutions(keywordSources));
-        return features;
-    }
-
-    private void applyHeaderFlags(DocumentFeatures features, List<List<String>> headers) {
-        features.setHasBalanceColumn(matchesAnyHeader(headers, BALANCE_HEADERS));
-        features.setHasDebitCreditSplit(matchesAnyHeader(headers, CREDIT_HEADERS) && matchesAnyHeader(headers, DEBIT_HEADERS));
-        if (!features.isHasDateColumn()) {
-            features.setHasDateColumn(matchesAnyHeader(headers, TRADE_DATE_HEADERS) || matchesAnyHeader(headers, POST_DATE_HEADERS));
-        }
-        if (!features.isHasAmountColumn()) {
-            features.setHasAmountColumn(matchesAnyHeader(headers, AMOUNT_HEADERS)
-                    || matchesAnyHeader(headers, CREDIT_HEADERS)
-                    || matchesAnyHeader(headers, DEBIT_HEADERS));
-        }
-    }
-
-    private List<List<String>> buildExcelHeaders(List<ExcelParseResult> parseResults) {
-        if (parseResults == null || parseResults.isEmpty()) {
-            return List.of();
-        }
-        Set<String> headers = new LinkedHashSet<>();
-        for (ExcelParseResult parseResult : parseResults) {
-            if (parseResult.getExcelData() != null) {
-                headers.addAll(parseResult.getExcelData().keySet());
-            }
-        }
-        if (headers.isEmpty()) {
-            return List.of();
-        }
-        return List.of(new ArrayList<>(headers));
-    }
-
-    private List<String> buildExcelTextSamples(List<ExcelParseResult> parseResults) {
-        return parseResults.stream()
-                .map(ExcelParseResult::getExcelData)
-                .filter(Objects::nonNull)
-                .limit(10)
-                .map(map -> map.values().stream()
-                        .filter(StrUtil::isNotBlank)
-                        .collect(Collectors.joining(" | ")))
-                .filter(StrUtil::isNotBlank)
-                .toList();
-    }
-
     private Map<String, Object> buildExcelEvidence(ExcelParseResult parseResult) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("sheetName", parseResult.getSheetName());
@@ -289,52 +175,6 @@ public class ParsePreparationService {
         String sheet = StrUtil.blankToDefault(parseResult.getSheetName(), "sheet0");
         int rowIndex = parseResult.getRowIndex() == null ? 0 : parseResult.getRowIndex();
         return "excel:" + sheet + ":r" + rowIndex;
-    }
-
-    private List<String> extractTopKeywords(List<String> sources) {
-        Map<String, Integer> counter = new LinkedHashMap<>();
-        for (String source : sources) {
-            if (StrUtil.isBlank(source)) {
-                continue;
-            }
-            // 这里刻意保留“高频但较短”的业务词，给规则路由提供比全文文本更稳定的信号。
-            for (String token : SPLIT_PATTERN.split(source)) {
-                String normalized = token == null ? "" : token.trim();
-                if (normalized.length() < 2 || normalized.length() > 24) {
-                    continue;
-                }
-                if (normalized.chars().allMatch(Character::isDigit)) {
-                    continue;
-                }
-                counter.merge(normalized, 1, Integer::sum);
-            }
-        }
-        return counter.entrySet().stream()
-                .sorted((left, right) -> {
-                    int compare = Integer.compare(right.getValue(), left.getValue());
-                    return compare != 0 ? compare : left.getKey().compareTo(right.getKey());
-                })
-                .limit(10)
-                .map(Map.Entry::getKey)
-                .toList();
-    }
-
-    private List<String> extractCandidateInstitutions(List<String> sources) {
-        return sources.stream()
-                .filter(StrUtil::isNotBlank)
-                .flatMap(source -> SPLIT_PATTERN.splitAsStream(source))
-                .map(String::trim)
-                .filter(item -> item.contains("银行")
-                        || item.toUpperCase(Locale.ROOT).contains("BANK")
-                        || item.contains("证券")
-                        || item.toUpperCase(Locale.ROOT).contains("BROKER"))
-                .distinct()
-                .limit(10)
-                .toList();
-    }
-
-    private boolean matchesAnyHeader(List<List<String>> headers, String[] candidates) {
-        return headers.stream().flatMap(Collection::stream).anyMatch(header -> matchesAnyHeader(header, candidates));
     }
 
     private boolean matchesAnyHeader(String header, String[] candidates) {

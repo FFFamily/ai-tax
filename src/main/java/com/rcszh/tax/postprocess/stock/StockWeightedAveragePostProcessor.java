@@ -1,14 +1,11 @@
 package com.rcszh.tax.postprocess.stock;
 
-import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.constant.ResultBaseFieldConstant;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.postprocess.RecordPostProcessor;
 import com.rcszh.tax.postprocess.RecordPostProcessContext;
 import com.rcszh.tax.postprocess.RecordValueUtil;
-import com.rcszh.tax.postprocess.stock.model.StockCapitalTransferRecord;
-import com.rcszh.tax.postprocess.stock.model.StockDividendRecord;
 import com.rcszh.tax.postprocess.stock.model.StockEvent;
 import com.rcszh.tax.postprocess.stock.model.StockGroupKey;
 import com.rcszh.tax.postprocess.stock.model.StockPositionState;
@@ -17,10 +14,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -28,7 +23,7 @@ import java.util.stream.Collectors;
 /**
  * 股票/证券交易二次加工：
  * - 成本法：移动加权平均单价
- * - 支持：买入/卖出/拆分(拆股/合股)/股息
+ * - 支持：买入/卖出
  * - 产出：卖出记录的财产原值(卖出成本)、卖出额(如提供卖价)、收益/亏损等字段
  *
  * 输入 records 仍来自 AI 抽取，因此这里对字段名做了一定容错（支持中英/不同命名）。
@@ -78,10 +73,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
     /**
      * 对股票相关流水执行加权平均单价（移动平均）计算：
      * - BUY：增加持仓成本与数量，重算均价
-     * - SPLIT：按比例调整数量，持仓成本不变，重算均价
      * - SELL：按卖出前均价结转卖出成本（财产原值），若提供卖价则计算卖出额与收益/亏损
-     *
-     * 输出：仅保留“需要申报/纳税的记录”（卖出/股息），其他非股票类型 records 原样保留，方便后续扩展更多 processor。
      *
      * @param parseResult 包含原始股票流水并承载计算结果和告警的解析结果
      * @param taskItem 当前文档任务项，本处理器当前不直接使用
@@ -90,20 +82,7 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
     @Override
     public void process(AIParseResult parseResult, DocumentTaskItem taskItem,
                         DocumentWorkflow workflow, RecordPostProcessContext context) {
-        // 将股票相关流水从 records 中抽出来加工；其他类型记录原样保留，方便后续扩展更多 processor
-        /** 预留的股票原始流水集合，用于后续恢复股票与其他记录分流。 */
-        List<Map<String, Object>> stockRaw = new ArrayList<>();
-        /** 非股票记录集合，输出时保持原样。 */
-        List<Map<String, Object>> others = new ArrayList<>();
-        /** AI 抽取的原始 records。 */
         List<Map<String, Object>> records = parseResult.getRecords();
-//        for (Map<String, Object> r : records) {
-//            if (isStockRelated(r)) stockRaw.add(r);
-//            else others.add(r);
-//        }
-//        if (stockRaw.isEmpty()) {
-//            return records;
-//        }
 
         // events 是经过字段容错解析并按交易日期排序的标准股票事件。
         List<StockEvent> events = records.stream()
@@ -121,18 +100,12 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
         Map<StockGroupKey, List<StockEvent>> groupMap = events.stream()
                 .collect(Collectors.groupingBy(StockEvent::groupKey, LinkedHashMap::new, Collectors.toList()));
 
-        // out 汇总保留记录与后处理产生的申报记录。
-        List<Map<String, Object>> out = new ArrayList<>(others);
-        for (Map.Entry<StockGroupKey, List<StockEvent>> entry : groupMap.entrySet()) {
-            StockGroupKey key = entry.getKey();
+        for (List<StockEvent> group : groupMap.values()) {
             StockPositionState ps = null;
-            for (StockEvent e : entry.getValue()) {
+            for (StockEvent e : group) {
                 switch (e.kind()) {
                     case BUY -> ps = applyBuy(parseResult, ps, e);
-                    case SELL -> applySell(parseResult, out, ps, key, e);
-//                    case SPLIT -> applySplit(parseResult, ps, e);
-//                    case DIVIDEND -> out.add(dividendRecord(key, e));
-//                    case UNKNOWN -> parseResult.getWarnings().add("无法识别的股票记录已忽略：" + safeSummary(e.raw()));
+                    case SELL -> applySell(parseResult, ps, e);
                 }
             }
         }
@@ -166,15 +139,13 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
     }
 
     /**
-     * 卖出出账：按“卖出前均价”结转卖出成本（财产原值），更新持仓台账，并产出可申报的卖出明细记录。
+     * 卖出出账：按“卖出前均价”结转卖出成本（财产原值），并更新持仓台账。
      *
      * @param parseResult 用于回写收益字段和记录计算告警
-     * @param out 申报记录输出集合
      * @param ps 卖出前持仓状态；为空时尝试查询历史持仓
-     * @param key 当前账户和股票标的分组键
      * @param e 当前卖出事件
      */
-    private static void applySell(AIParseResult parseResult, List<Map<String, Object>> out, StockPositionState ps, StockGroupKey key, StockEvent e) {
+    private static void applySell(AIParseResult parseResult, StockPositionState ps, StockEvent e) {
         if (e.qty() == null || e.qty().compareTo(BigDecimal.ZERO) == 0) {
             parseResult.getWarnings().add("卖出记录缺少数量，已忽略：" + safeSummary(e.raw()));
             return;
@@ -201,18 +172,13 @@ public class StockWeightedAveragePostProcessor implements RecordPostProcessor {
 
         // 若提供卖价，可计算卖出额/收益亏损；若未提供，则只输出成本
         // 如果已经有了发生额，就可以直接计算
-        BigDecimal result = null;
         if (e.transactionAmount() != null){
-            result = e.transactionAmount().subtract(originalValue);
-            e.raw().put(ResultBaseFieldConstant.INCOME_MONEY, result);
+            e.raw().put(ResultBaseFieldConstant.INCOME_MONEY, e.transactionAmount().subtract(originalValue));
             // 持股数量减少
             ps.setPositionQty(ps.getPositionQty().subtract(sellQty));
             ps.setPositionCostTotal(ps.getPositionCostTotal().subtract(originalValue));
             ps.recalcAvg();
-            return;
         }
-        BigDecimal transferIncome = e.price() == null ? null : sellQty.multiply(e.price(), MC);
-        BigDecimal gainLoss = transferIncome == null ? null : transferIncome.subtract(originalValue, MC);
     }
 
     /**

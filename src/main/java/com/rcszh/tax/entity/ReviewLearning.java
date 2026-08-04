@@ -15,7 +15,6 @@ public class ReviewLearning {
     private Long taskId;
     private Long taskItemId;
     private String workflowCode;
-    private String routeSummary;
     private String reviewReasons;
     private String reviewedRecords;
     private String reviewer;

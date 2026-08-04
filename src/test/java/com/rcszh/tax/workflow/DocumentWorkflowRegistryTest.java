@@ -19,7 +19,8 @@ class DocumentWorkflowRegistryTest {
         for (OverseasIncomeTypeEnum incomeType : OverseasIncomeTypeEnum.values()) {
             for (IncomeMaterialTypeEnum materialType : incomeType.getMaterials()) {
                 DocumentWorkflow workflow = registry.require(registry.codeOf(incomeType, materialType));
-                assertThat(workflow.name()).contains(incomeType.getLabel(), materialType.getLabel());
+                assertThat(workflow.code()).isEqualTo(registry.codeOf(incomeType, materialType));
+                assertThat(workflow.documentType()).isNotBlank();
                 assertThat(workflow.buildPrompt()).contains("目标输出格式");
             }
         }

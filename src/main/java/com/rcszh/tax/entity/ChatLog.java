@@ -16,7 +16,6 @@ public class ChatLog {
     private Long id;
     private String prompt;
     private String result;
-    private Integer token;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

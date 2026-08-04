@@ -36,7 +36,6 @@ public class ReviewLearningService {
         learning.setTaskItemId(taskItem.getId());
         learning.setTaskId(taskItem.getTaskId());
         learning.setWorkflowCode(taskItem.getWorkflowCode());
-        learning.setRouteSummary(JSONUtil.toJsonStr(taskItem.getRouteSummary()));
         learning.setReviewReasons(taskItem.getReviewReasons());
         learning.setReviewedRecords(JSONUtil.toJsonStr(reviewedRecords));
         learning.setReviewer(reviewer);
@@ -59,7 +58,6 @@ public class ReviewLearningService {
         result.put("taskId", learning.getTaskId());
         result.put("taskItemId", learning.getTaskItemId());
         result.put("workflowCode", learning.getWorkflowCode());
-        result.put("routeSummary", parseJson(learning.getRouteSummary()));
         result.put("reviewReasons", parseJson(learning.getReviewReasons()));
         result.put("reviewedRecords", parseJson(learning.getReviewedRecords()));
         result.put("reviewer", learning.getReviewer());
