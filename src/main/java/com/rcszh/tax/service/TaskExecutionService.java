@@ -2,6 +2,7 @@ package com.rcszh.tax.service;
 
 import com.rcszh.tax.dto.CreateDocumentTaskDto;
 import com.rcszh.tax.server.DocumentTaskServer;
+import com.rcszh.tax.threads.DocumentTaskAsyncRunner;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 

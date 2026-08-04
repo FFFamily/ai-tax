@@ -6,7 +6,7 @@ import com.rcszh.tax.dto.executiontask.ExecutionTaskDetailResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskOptionsResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskPageResponse;
 import com.rcszh.tax.dto.executiontask.ExecutionTaskResultResponse;
-import com.rcszh.tax.service.ExecutionTaskService;
+import com.rcszh.tax.service.task.ExecutionTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

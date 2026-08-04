@@ -1,4 +1,4 @@
-package com.rcszh.tax.service;
+package com.rcszh.tax.service.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rcszh.tax.common.BusinessException;
@@ -23,6 +23,8 @@ import com.rcszh.tax.mapper.TaxExecutionTaskAttemptMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
+import com.rcszh.tax.service.DocumentParseTaskCreatedEvent;
+import com.rcszh.tax.service.StorageService;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,7 +55,7 @@ import java.util.stream.Collectors;
 public class ExecutionTaskService {
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "pdf", "xls", "xlsx", "xlsm", "xlsb", "csv", "png", "jpg", "jpeg"
+            "pdf", "xls", "xlsx", "xlsm", "xlsb", "csv"
     );
     private static final Map<String, Set<String>> CONTENT_TYPES = Map.ofEntries(
             Map.entry("pdf", Set.of("application/pdf")),
@@ -61,10 +63,7 @@ public class ExecutionTaskService {
             Map.entry("xlsx", Set.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
             Map.entry("xlsm", Set.of("application/vnd.ms-excel.sheet.macroenabled.12", "application/vnd.ms-excel")),
             Map.entry("xlsb", Set.of("application/vnd.ms-excel.sheet.binary.macroenabled.12", "application/vnd.ms-excel")),
-            Map.entry("csv", Set.of("text/csv", "application/csv", "application/vnd.ms-excel", "text/plain")),
-            Map.entry("png", Set.of("image/png")),
-            Map.entry("jpg", Set.of("image/jpeg")),
-            Map.entry("jpeg", Set.of("image/jpeg"))
+            Map.entry("csv", Set.of("text/csv", "application/csv", "application/vnd.ms-excel", "text/plain"))
     );
 
     @Resource
