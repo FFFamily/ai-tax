@@ -64,15 +64,6 @@ CREATE TABLE IF NOT EXISTS tax_execution_task_attempt (
     KEY idx_execution_attempt_task (execution_task_id)
 );
 
-CREATE TABLE IF NOT EXISTS tax_api_token (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    provider VARCHAR(64) NOT NULL,
-    token VARCHAR(2000) NOT NULL,
-    enabled TINYINT(1) DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS tax_chat_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     prompt LONGTEXT,

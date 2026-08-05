@@ -36,8 +36,6 @@ public class ParseFileServer {
     );
 
     @Resource
-    private ApiTokenServer apiTokenServer;
-    @Resource
     private AppProperties appProperties;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -288,7 +286,7 @@ public class ParseFileServer {
     }
 
     private String authorization() {
-        return "Bearer " + apiTokenServer.getMinerUToken();
+        return "Bearer " + appProperties.getMineru().getToken();
     }
 
     private static void closeQuietly(InputStream inputStream) {
