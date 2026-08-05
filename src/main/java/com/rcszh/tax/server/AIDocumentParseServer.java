@@ -12,7 +12,6 @@ import java.util.Map;
 
 
 public class AIDocumentParseServer {
-    private static final Logger log = LoggerFactory.getLogger(AIDocumentParseServer.class);
 
     /**
      * 生成AI解析的Prompt

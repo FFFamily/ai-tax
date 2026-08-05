@@ -1,4 +1,4 @@
-package com.rcszh.tax.service;
+package com.rcszh.tax.service.task;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.rcszh.tax.entity.task.TaxExecutionTask;

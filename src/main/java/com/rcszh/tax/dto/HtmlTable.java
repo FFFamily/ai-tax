@@ -13,10 +13,6 @@ public class HtmlTable {
     private List<String> head;
     // 表格内容
     private List<List<Object>> items;
-    // 是否满足所有条件
-    private Boolean isSuccess = true;
-    // 失败原因
-    private String failReason;
     // 所在页码
     private Integer pageIdx;
 

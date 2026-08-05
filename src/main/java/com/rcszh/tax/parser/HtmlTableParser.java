@@ -1,4 +1,4 @@
-package com.rcszh.tax.ir;
+package com.rcszh.tax.parser;
 
 import com.rcszh.tax.dto.HtmlTable;
 import org.jsoup.Jsoup;

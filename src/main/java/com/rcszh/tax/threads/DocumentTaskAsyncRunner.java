@@ -11,7 +11,7 @@ import com.rcszh.tax.parser.DocumentParserRegistry;
 import com.rcszh.tax.postprocess.RecordPostProcessService;
 import com.rcszh.tax.server.DocumentTaskServer;
 import com.rcszh.tax.server.ParseFileServer;
-import com.rcszh.tax.service.ExecutionTaskStateService;
+import com.rcszh.tax.service.task.ExecutionTaskStateService;
 import com.rcszh.tax.service.StorageService;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;

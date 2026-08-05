@@ -1,4 +1,4 @@
-package com.rcszh.tax.service;
+package com.rcszh.tax.entity.document;
 
 import com.rcszh.tax.threads.DocumentTaskAsyncRunner;
 import jakarta.annotation.Resource;

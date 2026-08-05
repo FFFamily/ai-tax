@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.rcszh.tax.dto.ExcelParseResult;
 import com.rcszh.tax.dto.HtmlTable;
 import com.rcszh.tax.dto.MinerUFileParseResult;
+import com.rcszh.tax.parser.HtmlTableParser;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 

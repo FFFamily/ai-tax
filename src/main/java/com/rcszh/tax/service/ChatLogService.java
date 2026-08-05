@@ -10,7 +10,7 @@ public class ChatLogService {
     @Resource
     private ChatLogMapper chatLogMapper;
 
-    public boolean save(ChatLog chatLog) {
-        return chatLogMapper.insert(chatLog) == 1;
+    public void save(ChatLog chatLog) {
+        chatLogMapper.insert(chatLog);
     }
 }

@@ -23,7 +23,7 @@ import com.rcszh.tax.mapper.TaxExecutionTaskAttemptMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskFileMapper;
 import com.rcszh.tax.mapper.TaxExecutionTaskMapper;
 import com.rcszh.tax.server.DocumentTaskServer;
-import com.rcszh.tax.service.DocumentParseTaskCreatedEvent;
+import com.rcszh.tax.entity.document.DocumentParseTaskCreatedEvent;
 import com.rcszh.tax.service.StorageService;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
 import jakarta.annotation.Resource;

@@ -8,9 +8,9 @@ import com.rcszh.tax.entity.task.DocumentTask;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
 import com.rcszh.tax.entity.task.TaxTask;
 import com.rcszh.tax.entity.task.TaxTaskItem;
-import com.rcszh.tax.entity.ReviewLearning;
+
 import com.rcszh.tax.enums.RunTaskStatusEnum;
-import com.rcszh.tax.mapper.ReviewLearningMapper;
+
 import com.rcszh.tax.mapper.TaxTaskItemMapper;
 import com.rcszh.tax.mapper.TaxTaskMapper;
 import jakarta.annotation.Resource;
@@ -28,8 +28,7 @@ public class DocumentTaskServer {
     private TaxTaskMapper taxTaskMapper;
     @Resource
     private TaxTaskItemMapper taxTaskItemMapper;
-    @Resource
-    private ReviewLearningMapper reviewLearningMapper;
+
     @Transactional(rollbackFor = Exception.class)
     public CreatedTask createTaskWithItems(CreateDocumentTaskDto dto) {
         TaxTask task = new TaxTask();
@@ -60,8 +59,6 @@ public class DocumentTaskServer {
         if (taskIds == null || taskIds.isEmpty()) {
             return;
         }
-        reviewLearningMapper.delete(new LambdaQueryWrapper<ReviewLearning>()
-                .in(ReviewLearning::getTaskId, taskIds));
         taxTaskItemMapper.delete(new LambdaQueryWrapper<TaxTaskItem>()
                 .in(TaxTaskItem::getTaskId, taskIds));
         taxTaskMapper.delete(new LambdaQueryWrapper<TaxTask>()
@@ -149,7 +146,6 @@ public class DocumentTaskServer {
         result.setFileUrl(item.getFileUrl());
         result.setChangeResult(item.getChangeResult());
         result.setReviewReasons(item.getReviewReasons());
-        applyLatestReview(result, latestReview(item.getId()));
         return result;
     }
 
@@ -175,34 +171,8 @@ public class DocumentTaskServer {
         result.setFileUrl(item.getFileUrl());
         result.setChangeResult(item.getChangeResult());
         result.setReviewReasons(item.getReviewReasons());
-        applyLatestReview(result, latestReview(item.getId()));
         return result;
     }
 
-    private ReviewLearning latestReview(Long taskItemId) {
-        if (taskItemId == null) {
-            return null;
-        }
-        return reviewLearningMapper.selectOne(new LambdaQueryWrapper<ReviewLearning>()
-                .eq(ReviewLearning::getTaskItemId, taskItemId)
-                .orderByDesc(ReviewLearning::getId)
-                .last("LIMIT 1"));
-    }
-
-    private void applyLatestReview(DocumentTaskItem item, ReviewLearning review) {
-        if (review == null) {
-            return;
-        }
-        item.setReviewer(review.getReviewer());
-        item.setReviewComment(review.getComment());
-    }
-
-    private void applyLatestReview(ExecutionTaskResultItemResponse item, ReviewLearning review) {
-        if (review == null) {
-            return;
-        }
-        item.setReviewer(review.getReviewer());
-        item.setReviewComment(review.getComment());
-    }
 
 }
