@@ -4,7 +4,7 @@ import com.rcszh.tax.ai.DeepSeekAi;
 import com.rcszh.tax.dto.ExcelParseResult;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
-import com.rcszh.tax.ir.ParsePreparationResult;
+import com.rcszh.tax.ir.ParsedDocument;
 import com.rcszh.tax.ir.ParsePreparationService;
 import com.rcszh.tax.util.ExcelUtil;
 import com.rcszh.tax.workflow.DocumentWorkflow;
@@ -41,12 +41,12 @@ public class ExcelParser extends BaseParser{
             throw new IllegalStateException("Excel 本地文件不存在: " + fileUrl);
         }
         List<ExcelParseResult> results = ExcelUtil.readExcel(localFilePath.toFile());
-        // Excel 无需 OCR，直接把行列数据标准化后进入固定流程与后处理。
-        ParsePreparationResult preparation = parsePreparationService.prepareExcel(results);
+        // Excel 与 PDF 在此收敛为相同的无损文档结构。
+        ParsedDocument document = parsePreparationService.prepareExcel(results);
         DocumentWorkflow workflow = resolveWorkflow(info, workflowRegistry);
         logger.info("使用固定文档流程：{}", workflow.code());
-        info.setPreparedTransactionLines(preparation.getTransactionLines());
+        info.setPreparedDocument(document);
         String prompt = workflow.buildPrompt();
-        return deepSeekAi.chat(results, prompt, "", workflow);
+        return deepSeekAi.chat(document, prompt, "", workflow);
     }
 }

@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class MinerUFileParseResult extends BaseParseResult {
+public class MinerUFileParseResult {
     // 类型
     private String type;
     // 文本内容

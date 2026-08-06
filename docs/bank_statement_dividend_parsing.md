@@ -23,7 +23,7 @@
 建议落地成 4 层（每层都可插拔、可灰度）：
 
 1) **文档预处理 / 统一中间表示（IR）**
-   - 把各种来源（PDF/图片/OCR/Excel/第三方报表）先尽量转成一个“通用交易流水”中间表示 `TransactionLine[]`。
+   - 把各种来源转换为无业务语义的 `ParsedDocument`，其中表格统一为 `DataTable[]`，非表格正文保存在 `TextBlock[]`。
 2) **类型识别（Document Routing）**
    - 先判定“这份数据更像哪一类”（银行流水/券商对账单/股息汇总表/用户自制表等），并在候选类型集合里做路由。
 3) **抽取器（Extractor）**
@@ -31,8 +31,7 @@
 4) **规范化 + 质量评估 + 人工兜底**
    - 做字段规范、金额方向统一、币种/日期标准化、证据链（evidence）保留；低置信进入人工复核。
 
-核心原则：**先把“版式差异”消掉，再做“业务语义抽取”。**  
-对“银行流水提股息”来说，最稳的统一点通常不是“表头长什么样”，而是“它最终都是一串交易流水”。
+核心原则：**前置阶段只消除文件格式差异并保留原始结构，业务字段解释延迟到对应专项。**
 
 ---
 
@@ -93,45 +92,40 @@ LLM 分类输出建议包含置信与原因，方便后续灰度/回溯：
 
 ---
 
-## 3. 统一中间表示（IR）：降低“银行差异”对 Prompt 的影响
-建议将各种输入先统一为交易流水的最小字段集（类似你项目里股票解析文件的“最小字段集”思想）：
+## 3. 统一中间表示（IR）：先统一结构，再解释业务语义
+PDF 和 Excel 都先进入相同的无损文档模型。`DataTable` 只描述表头、行、单元格和来源位置，不包含日期、金额、方向等业务字段。
 
-### 3.1 TransactionLine（建议字段）
+### 3.1 DataTable（通用输入）
 ```json
 {
-  "rowId": "p3_t2_r15",          // 可追溯：页/表/行，或 excel 的 sheet/row
-  "tradeDate": "2025-01-18",
-  "postDate": "2025-01-18",      // 可选：记账日期/入账日期
-  "summary": "股息入账",
-  "counterparty": "XXXX公司",
-  "direction": "CREDIT",         // CREDIT/DEBIT
-  "amount": 1234.56,
-  "currency": "CNY",
-  "balance": 8888.88,            // 可选
-  "rawText": "...",              // 可选：拼接摘要/备注，便于回溯
-  "evidence": {                  // 可选：原始证据
-    "page": 3,
-    "tableIndex": 2,
-    "cells": ["2025/01/18","股息入账","1,234.56","8,888.88"]
-  }
+  "tableId": "pdf:p3:t2",
+  "sourceType": "pdf",
+  "title": "交易明细",
+  "pageIndex": 3,
+  "headers": ["日期", "摘要", "收入", "余额"],
+  "rows": [
+    {
+      "rowIndex": 15,
+      "cells": ["2025/01/18", "股息入账", "1,234.56", "8,888.88"]
+    }
+  ]
 }
 ```
 
-你会发现：一旦把“银行版式差异”压缩进这个 IR，后续的“股息识别与结构化” Prompt 基本就能统一了。
+进入股息专项后，`DividendSourceLineMapper` 才将表格行解释为 `DividendSourceLine`，并保留 `rowId/evidence`。
 
 ### 3.2 IR 怎么来：三条路（按稳定性排序）
-1) **Excel/csv：规则列映射（优先）**
-   - 先用表头同义词字典做列映射：日期列/摘要列/金额列/余额列
-   - 实在映射不了再让 LLM 做“列名 → 字段”映射（只用 headers，不用整表）
-2) **PDF（可提取到表格结构）：表格 → IR**
-   - MinerU 若能给 table 结构，优先按表格解析（类似 `DocumentServer.convertTableHtmlToJson` 的思路）
-3) **扫描件/图片：OCR → 行/表 → IR**
+1) **Excel/csv：Sheet → DataTable**
+   - 保留原始表头顺序、行号和空单元格位置，不在此阶段解释业务字段。
+2) **PDF（可提取到表格结构）：HTML 表格 → DataTable**
+   - MinerU 的正文块同时转换为 `TextBlock`，避免只保留表格导致上下文丢失。
+3) **扫描件/图片：OCR → DataTable/TextBlock**
    - 这里建议你把 `ParseFileServer` 的 `is_ocr=false` 做成可配置；当检测到“文本极少/疑似扫描”时开启 OCR（并记录来源）
 
 ---
 
 ## 4. 股息识别：从“交易流水”里找“股息交易”
-有了 IR 后，“股息提取”就变成两步：
+有了通用文档 IR 后，“股息提取”首先将表格行映射为 `DividendSourceLine`，再执行两步业务处理：
 
 ### 4.1 交易级筛选（规则优先）
 规则筛选用于“召回”，尽量别漏：
@@ -214,7 +208,7 @@ LLM 分类输出建议包含置信与原因，方便后续灰度/回溯：
 - 维护成本更低：新增一个银行/一种格式，大概率只需要补充 `matchRule + header 同义词 + 少量 few-shot`。
 
 ### 7.2 灰度路径
-1) 先做 IR（把 PDF/Excel 都吐出 `TransactionLine[]`），不改变现有股息 Prompt，仅用于观测差异
+1) 先做文档 IR（把 PDF/Excel 都转换为 `ParsedDocument`），统一 AI 输入并观测差异
 2) 再加路由：规则优先 + LLM fallback，但仍允许用户手动选择“我上传的是哪种”
 3) 最后把股息抽取变成“IR → 股息记录”，并加质量评估/人工兜底闭环
 
@@ -227,7 +221,7 @@ LLM 分类输出建议包含置信与原因，方便后续灰度/回溯：
 建议包名（示例）：
 
 - `com.rcszh.tax.route`：文档路由（类型识别）
-- `com.rcszh.tax.ir`：中间表示（TransactionLine 等）
+- `com.rcszh.tax.ir`：通用文档中间表示（`ParsedDocument`、`DataTable`、`TextBlock`）
 - `com.rcszh.tax.extractor`：抽取器（银行流水抽取器/股息抽取器/通用抽取器）
 - `com.rcszh.tax.quality`：质量评估（规则校验、置信度）
 
@@ -239,7 +233,7 @@ LLM 分类输出建议包含置信与原因，方便后续灰度/回溯：
 
 推荐接入点：在 `doParse()` 里拿到 `parseResults/results` 后、获取 prompt 前加入：
 
-1) `IRBuilder`：把 `parseResults` / `ExcelParseResult` 转成 `TransactionLine[]`
+1) `ParsePreparationService`：把 `parseResults` / `ExcelParseResult` 转成 `ParsedDocument`
 2) `DocumentRouter`：根据 IR/features 选择 `documentId`（或直接选择 extractor）
 3) 执行对应 extractor（LLM/规则），输出统一 records
 
@@ -258,16 +252,16 @@ public record RouteResult(
         List<String> reasons
 ) {}
 
-public interface IRBuilder<I> {
-    List<TransactionLine> build(I input);
+public interface DocumentAdapter<I> {
+    ParsedDocument adapt(I input);
 }
 
 public interface DividendExtractor {
-    DividendExtractResult extract(List<TransactionLine> lines, ExtractContext ctx);
+    DividendExtractResult extract(List<DividendSourceLine> lines, ExtractContext ctx);
 }
 ```
 
-`TransactionLine` / `DividendExtractResult` 建议是你们自己的 DTO（并带 `rowId/evidence`）。
+`DividendSourceLine` / `DividendExtractResult` 是股息专项 DTO，并带 `rowId/evidence`。
 
 ### 8.4 配置怎么存（建议）
 沿用你们动态表的思路（`tax_question_document`），建议新增/扩展字段：
@@ -338,7 +332,7 @@ public interface DividendExtractor {
 - 必须返回 evidenceRowIds，用于回溯原始行。
 
 交易流水（JSON）：
-{{candidateTransactionLinesJson}}
+{{candidateDividendSourceLinesJson}}
 ```
 
 ---
@@ -357,6 +351,5 @@ public interface DividendExtractor {
 
 - **密钥与 token 不要硬编码**：`ParseFileServer` / `DeepSeekAi` 里都有硬编码 key/token，建议迁移到配置中心/环境变量，并做脱敏日志。
 - **OCR 开关需要可配置**：`ParseFileServer.sendParseRequest()` 当前 `is_ocr=false`，遇到扫描件会直接失败或质量很差；建议根据“文本密度”自动开启。
-- **控制 LLM 输入大小**：先 IR、再候选行抽取，会显著降低 token；否则并发切片（`AiManage.groupArrayByConfig`）也会很贵。
+- **控制 LLM 输入大小**：`DocumentChunker` 按表格行数和文本长度分片，并在每个表格分片中重复携带表头。
 - **保留证据链**：没有 `rowId/evidence` 的结构化结果很难审计，也很难做人工复核提效。
-

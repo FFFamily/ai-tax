@@ -3,8 +3,10 @@ package com.rcszh.tax.ai;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.rcszh.tax.config.AppProperties;
-import com.rcszh.tax.dto.BaseParseResult;
 import com.rcszh.tax.entity.AIParseResult;
+import com.rcszh.tax.ir.DocumentChunk;
+import com.rcszh.tax.ir.DocumentChunker;
+import com.rcszh.tax.ir.ParsedDocument;
 import com.rcszh.tax.server.AIDocumentParseServer;
 import com.rcszh.tax.workflow.DocumentWorkflow;
 import jakarta.annotation.Resource;
@@ -24,9 +26,11 @@ public class DeepSeekAi extends AiManage {
 
     @Resource
     private AppProperties appProperties;
+    @Resource
+    private DocumentChunker documentChunker;
 
     @Override
-    public AIParseResult chat(List<? extends BaseParseResult> array,
+    public AIParseResult chat(ParsedDocument document,
                               String prompt,
                               String agentCall,
                               DocumentWorkflow workflow) {
@@ -49,7 +53,7 @@ public class DeepSeekAi extends AiManage {
                 .saver(new MemorySaver())
                 .build();
         long startTime = System.currentTimeMillis();
-        List<List<? extends BaseParseResult>> taskList = groupArray(array, workflow.pageStep());
+        List<DocumentChunk> taskList = documentChunker.chunk(document, workflow.chunkSize());
         AIParseResult taskResult = doTask(agent, prompt, taskList);
         log.info("耗时：{}秒", (System.currentTimeMillis() - startTime) / 1000);
         return taskResult;

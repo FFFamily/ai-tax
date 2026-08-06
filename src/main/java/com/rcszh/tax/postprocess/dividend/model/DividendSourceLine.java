@@ -1,4 +1,4 @@
-package com.rcszh.tax.ir;
+package com.rcszh.tax.postprocess.dividend.model;
 
 import lombok.Data;
 
@@ -6,8 +6,9 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/** 股息专项处理中由通用表格行归一化得到的来源流水。 */
 @Data
-public class TransactionLine {
+public class DividendSourceLine {
     private String rowId;
     private Integer pageIndex;
     private String sourceType;

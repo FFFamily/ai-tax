@@ -1,8 +1,8 @@
 package com.rcszh.tax.postprocess.dividend.service;
 
 import cn.hutool.core.util.StrUtil;
-import com.rcszh.tax.ir.TransactionLine;
 import com.rcszh.tax.postprocess.dividend.model.DividendCandidateRecord;
+import com.rcszh.tax.postprocess.dividend.model.DividendSourceLine;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -38,14 +38,14 @@ public class DividendCandidateService {
      * @param lines 上游标准化后的交易流水
      * @return 按输入顺序返回的股息候选列表；无输入时返回空列表
      */
-    public List<DividendCandidateRecord> collectCandidates(List<TransactionLine> lines) {
+    public List<DividendCandidateRecord> collectCandidates(List<DividendSourceLine> lines) {
         // result 保留输入顺序，便于后续证据追溯和稳定聚合。
         List<DividendCandidateRecord> result = new ArrayList<>();
         if (lines == null || lines.isEmpty()) {
             return result;
         }
         // 这一层的目标是“高召回找疑似分红行”，宁可多找一些，也不在这里过早过滤掉候选。
-        for (TransactionLine line : lines) {
+        for (DividendSourceLine line : lines) {
             DividendCandidateRecord record = evaluateLine(line);
             if (record != null) {
                 result.add(record);
@@ -60,7 +60,7 @@ public class DividendCandidateService {
      * @param line 待评估的标准化流水
      * @return 分数不低于 0.45 的候选记录，否则返回 {@code null}
      */
-    private DividendCandidateRecord evaluateLine(TransactionLine line) {
+    private DividendCandidateRecord evaluateLine(DividendSourceLine line) {
         if (line == null) {
             return null;
         }

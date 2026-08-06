@@ -39,7 +39,7 @@ public interface RecordPostProcessor {
      * 判断当前上下文是否需要执行此处理器。
      *
      * @param parseResult AI 解析结果，包含 records 和 warnings
-     * @param taskItem 当前文档任务项，包含路由结果和预处理流水等上下文
+     * @param taskItem 当前文档任务项，包含路由结果和预处理文档等上下文
      * @param workflow 固定文档流程
      * @param context 本次后处理调用的临时上下文
      * @return {@code true} 表示执行当前处理器

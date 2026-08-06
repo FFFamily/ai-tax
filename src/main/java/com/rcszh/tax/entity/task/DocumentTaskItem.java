@@ -2,11 +2,10 @@ package com.rcszh.tax.entity.task;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.rcszh.tax.ir.TransactionLine;
+import com.rcszh.tax.ir.ParsedDocument;
 import lombok.Data;
 
 import java.nio.file.Path;
-import java.util.List;
 
 @Data
 public class DocumentTaskItem {
@@ -39,7 +38,7 @@ public class DocumentTaskItem {
     private String reviewComment;
 
     @JsonIgnore
-    private List<TransactionLine> preparedTransactionLines = List.of();
+    private ParsedDocument preparedDocument = new ParsedDocument();
 
     @JsonIgnore
     private Path localFilePath;

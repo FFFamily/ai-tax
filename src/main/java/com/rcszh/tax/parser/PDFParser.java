@@ -6,7 +6,7 @@ import com.rcszh.tax.ai.DeepSeekAi;
 import com.rcszh.tax.dto.MinerUFileParseResult;
 import com.rcszh.tax.entity.AIParseResult;
 import com.rcszh.tax.entity.task.DocumentTaskItem;
-import com.rcszh.tax.ir.ParsePreparationResult;
+import com.rcszh.tax.ir.ParsedDocument;
 import com.rcszh.tax.ir.ParsePreparationService;
 import com.rcszh.tax.workflow.DocumentWorkflow;
 import com.rcszh.tax.workflow.DocumentWorkflowRegistry;
@@ -49,11 +49,11 @@ public class PDFParser extends BaseParser{
             return null;
         }
         List<MinerUFileParseResult> parseResults = JSONUtil.parseArray(result).toList(MinerUFileParseResult.class);
-        // 预处理阶段把 OCR 结果转换成可后处理的标准化中间表示。
-        ParsePreparationResult preparation = parsePreparationService.preparePdf(parseResults);
+        // 来源适配只保留无损文档结构，业务字段解释延迟到专项处理阶段。
+        ParsedDocument document = parsePreparationService.preparePdf(parseResults);
         DocumentWorkflow workflow = resolveWorkflow(info, workflowRegistry);
         logger.info("使用固定文档流程：{}", workflow.code());
-        info.setPreparedTransactionLines(preparation.getTransactionLines());
+        info.setPreparedDocument(document);
         logger.info("开始执行AI解析");
         String prompt = workflow.buildPrompt();
         // 追加容错约束，避免 OCR 缺列或错位时模型直接丢弃候选数据。
@@ -62,6 +62,6 @@ public class PDFParser extends BaseParser{
                      如果匹配程度高于90%，可以手动改变表格结构并存入records数组中，同时也要在errorRecords数组中补充上不匹配原因
                      不能丢弃任何一个数据，如果不匹配，直接将原格式数据补充在errorRecords数组中并附带上不匹配原因
                 """;
-        return deepSeekAi.chat(parseResults, prompt, agentCall, workflow);
+        return deepSeekAi.chat(document, prompt, agentCall, workflow);
     }
 }

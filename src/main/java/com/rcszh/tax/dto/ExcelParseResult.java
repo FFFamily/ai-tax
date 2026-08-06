@@ -7,7 +7,7 @@ import java.util.Map;
 
 @Getter
 @Setter
-public class ExcelParseResult extends BaseParseResult{
+public class ExcelParseResult {
     private Map<String,String> excelData;
     private Integer rowIndex;
     private String sheetName;

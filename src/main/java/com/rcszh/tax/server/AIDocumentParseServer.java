@@ -27,6 +27,8 @@ public class AIDocumentParseServer {
                 你是一个专业的数据解析专家，擅长从文档数据中提取结构化数据。
                 用户会给你提供对应的数据解析规则，从数据解析结果中识别表格，并将表格数据映射到业务对象。
                 同时用户会给你提供其需要的解析的 record JSON表格字段格式，若没提供，则按照你的理解封装对应的record对象
+                输入统一为文档分片：tables[].headers 是有序表头，tables[].rows[].cells 是与表头按下标对应的原始单元格，
+                tables[].rows[].rowIndex 是来源行号；textBlocks[].text 保存同一文档中的非表格正文。不得因输入分片而合并或丢弃原始行。
                 """);
         prompt.append("\n");
         // 任务要求

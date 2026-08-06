@@ -14,13 +14,13 @@ public record DocumentWorkflow(
         String code,
         String documentType,
         Set<String> capabilities,
-        int pageStep,
+        int chunkSize,
         String prompt,
         String errorRecord,
         List<DocumentOutputField> outputFields) {
 
     public DocumentWorkflow {
-        pageStep = pageStep <= 0 ? 20 : pageStep;
+        chunkSize = chunkSize <= 0 ? 20 : chunkSize;
         prompt = prompt == null ? "" : prompt;
         errorRecord = errorRecord == null ? "" : errorRecord;
         capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
